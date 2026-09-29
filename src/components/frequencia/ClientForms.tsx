@@ -71,6 +71,41 @@ export function NovaAulaForm({ modulo }: { modulo: Modulo }) {
   );
 }
 
+// Abrir uma data nova (um domingo) sem digitar título: só módulo + data.
+export function NovaDataForm({ modulos }: { modulos: Modulo[] }) {
+  const [estado, acao] = useFormState(criarAula, estadoInicial);
+  return (
+    <form action={acao} className="flex flex-wrap items-end gap-3 rounded-lg bg-bg p-3">
+      <div>
+        <label className="mb-1 block text-xs text-text-secondary">DATA (DOMINGO)</label>
+        <input
+          name="data"
+          type="date"
+          required
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs text-text-secondary">MÓDULO</label>
+        <select
+          name="moduloId"
+          required
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+        >
+          {modulos.map((m) => (
+            <option key={m.id} value={m.id}>
+              Módulo {m.numero}
+              {m.tema ? ` · ${m.tema}` : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+      <Botao texto="Abrir data" textoCarregando="Criando…" />
+      <Mensagens estado={estado} />
+    </form>
+  );
+}
+
 export function FormularioPresenca({
   aulaId,
   roster,

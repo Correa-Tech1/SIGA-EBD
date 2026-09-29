@@ -1,9 +1,16 @@
 import { redirect } from "next/navigation";
 import { getSessaoAtual } from "@/lib/auth/session";
+import { Cabecalho } from "@/components/layout/Cabecalho";
+import { Rodape } from "@/components/layout/Rodape";
+import { MENU_COORDENACAO, MENU_PROFESSOR } from "@/components/layout/menus";
 
 // Mesma lógica do layout de coordenação, mas aceitando os dois papéis com
 // conta de verdade — a coordenação também pode espiar a Aba do Professor
 // (ex.: pra revisar como o Auxílio ao Professor está respondendo).
+//
+// Quando quem entra é a coordenação, o cabeçalho é o MESMO menu da
+// coordenação (não o do professor): antes, ao abrir "Auxílio ao Professor" o
+// menu trocava e não sobrava caminho de volta pro Início.
 export default async function ProfessorLayout({
   children,
 }: {
@@ -14,25 +21,17 @@ export default async function ProfessorLayout({
   if (!sessao.autenticado) redirect("/login");
   if (sessao.role !== "professor" && sessao.role !== "coordenacao") redirect("/");
 
+  const ehCoordenacao = sessao.role === "coordenacao";
+
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <header className="flex h-[72px] shrink-0 items-center justify-between bg-primary px-10">
-        <img src="/logo-siga-ebd.svg" alt="SIGA EBD" className="h-[42px] w-auto" />
-        <nav className="flex h-full items-center gap-8 text-sm text-white/70">
-          <a href="/minha-turma" className="text-white">
-            MINHA TURMA
-          </a>
-          <a href="/auxilio">AUXÍLIO AO PROFESSOR</a>
-        </nav>
-        <div className="text-sm text-white">
-          {sessao.nome} <span className="text-white/60">· {sessao.role === "coordenacao" ? "Coordenação" : "Professor"}</span>
-        </div>
-      </header>
+      <Cabecalho
+        itens={ehCoordenacao ? MENU_COORDENACAO : MENU_PROFESSOR}
+        nome={sessao.nome}
+        papel={ehCoordenacao ? "Coordenação" : "Professor"}
+      />
       <main className="flex-grow p-10">{children}</main>
-      <footer className="flex h-16 shrink-0 items-center justify-center gap-3 border-t border-border bg-surface">
-        <span className="text-xs text-text-secondary">O Sistema foi desenvolvido pela</span>
-        <img src="/logo-correa-tech.svg" alt="Correa Tech" className="h-[36px] w-auto" />
-      </footer>
+      <Rodape />
     </div>
   );
 }

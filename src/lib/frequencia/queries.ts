@@ -105,6 +105,64 @@ export async function listarPresencas(aulaId: string): Promise<PresencaExistente
   return (data ?? []) as PresencaExistente[];
 }
 
+export interface PresenteNaAula {
+  id: string;
+  nome: string;
+}
+
+export interface ResumoAula {
+  // false = ninguém lançou a chamada dessa data ainda (≠ "0 presentes")
+  temChamada: boolean;
+  presentes: PresenteNaAula[];
+}
+
+// Quem esteve presente em cada aula, com o nome — alimenta a lista de
+// domingos da tela de Frequência (clicou na data → abre os nomes).
+// Nomes vêm da view `pessoas_publicas` (id + nome, sem telefone) em blocos
+// pequenos, porque `.in()` com centenas de UUIDs estoura o tamanho da URL.
+export async function listarResumoPresencas(aulaIds: string[]): Promise<Map<string, ResumoAula>> {
+  const resumo = new Map<string, ResumoAula>();
+  if (aulaIds.length === 0) return resumo;
+
+  const supabase = createClient();
+
+  const linhas: { aula_id: string; pessoa_id: string; status: "presente" | "ausente" }[] = [];
+  const pagina = 1000;
+  for (let de = 0; ; de += pagina) {
+    const { data } = await supabase
+      .from("presencas")
+      .select("id, aula_id, pessoa_id, status")
+      .in("aula_id", aulaIds)
+      .order("id")
+      .range(de, de + pagina - 1);
+    const bloco = data ?? [];
+    linhas.push(...bloco);
+    if (bloco.length < pagina) break;
+  }
+
+  const idsPessoas = [...new Set(linhas.filter((l) => l.status === "presente").map((l) => l.pessoa_id))];
+  const nomes = new Map<string, string>();
+  for (let i = 0; i < idsPessoas.length; i += 60) {
+    const { data } = await supabase
+      .from("pessoas_publicas")
+      .select("id, nome")
+      .in("id", idsPessoas.slice(i, i + 60));
+    for (const p of data ?? []) nomes.set(p.id as string, p.nome as string);
+  }
+
+  for (const linha of linhas) {
+    const atual = resumo.get(linha.aula_id) ?? { temChamada: true, presentes: [] };
+    if (linha.status === "presente") {
+      atual.presentes.push({ id: linha.pessoa_id, nome: nomes.get(linha.pessoa_id) ?? "(sem nome)" });
+    }
+    resumo.set(linha.aula_id, atual);
+  }
+  for (const r of resumo.values()) {
+    r.presentes.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }
+  return resumo;
+}
+
 // Pessoas ainda não matriculadas nesta turma — a lista de onde a coordenação
 // escolhe quem adicionar ao chamar. Duas queries simples (em vez de um NOT
 // IN aninhado) porque nosso Database type é escrito à mão e não modela

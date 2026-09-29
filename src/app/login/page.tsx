@@ -25,7 +25,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-primary px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center text-center">
-          <img src="/logo-siga-ebd.svg" alt="SIGA EBD" className="h-16 w-auto" />
+          <img src="/logo-siga-ebd.svg" alt="SIGA EBD" className="h-24 w-auto" />
           <div className="mt-2 text-xs text-white/70">
             Sistema Integrado de Gestão e Auxílio da EBD
           </div>
@@ -84,7 +84,7 @@ export default function LoginPage() {
         <img
           src="/logo-correa-tech.svg"
           alt="Correa Tech"
-          className="h-9 w-auto opacity-85 brightness-0 invert"
+          className="h-16 w-auto opacity-85 brightness-0 invert"
         />
       </div>
     </div>

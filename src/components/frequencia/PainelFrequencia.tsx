@@ -4,9 +4,10 @@ import {
   listarRoster,
   listarPresencas,
   listarPessoasForaDaTurma,
+  listarResumoPresencas,
 } from "@/lib/frequencia/queries";
 import {
-  NovaAulaForm,
+  NovaDataForm,
   FormularioPresenca,
   FormularioMatricularExistente,
   FormularioMatricularNovo,
@@ -17,7 +18,14 @@ import { ListaMateriais } from "@/components/biblioteca/ListaMateriais";
 import { UploadMaterialDeAulaForm } from "@/components/biblioteca/ClientForms";
 import { getSessaoAtual } from "@/lib/auth/session";
 
-// Painel completo de uma turma: módulos → aulas → chamada. Compartilhado
+function rotuloDomingo(dataIso: string): string {
+  const data = new Date(dataIso + "T00:00:00");
+  const diaSemana = data.toLocaleDateString("pt-BR", { weekday: "long" });
+  const nome = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1).replace("-feira", "");
+  return `${nome} · ${data.toLocaleDateString("pt-BR")}`;
+}
+
+// Painel completo de uma turma: domingos (com quem esteve presente) → chamada. Compartilhado
 // entre a página da coordenação (/frequencia, vê qualquer turma) e a do
 // professor (/minha-turma, só a(s) própria(s)) — a diferença de acesso já
 // foi resolvida antes de chegar aqui (a página escolhe quais `turmas`
@@ -50,12 +58,13 @@ export async function PainelFrequencia({
 
   const aulaAtual = aulaSelecionadaId ? aulas.find((a) => a.id === aulaSelecionadaId) : undefined;
 
-  const [roster, candidatos, presencas, materiaisDaAula, sessao] = await Promise.all([
+  const [roster, candidatos, presencas, materiaisDaAula, sessao, resumoPorAula] = await Promise.all([
     listarRoster(turmaAtual.id),
     podeGerenciarMatricula ? listarPessoasForaDaTurma(turmaAtual.id) : Promise.resolve([]),
     aulaAtual ? listarPresencas(aulaAtual.id) : Promise.resolve([]),
     aulaAtual ? listarMateriaisDeAula(aulaAtual.id) : Promise.resolve([]),
     getSessaoAtual(),
+    listarResumoPresencas(aulas.map((a) => a.id)),
   ]);
 
   return (
@@ -89,49 +98,84 @@ export async function PainelFrequencia({
         </h2>
       </div>
 
-      {modulos.length === 0 && (
+      {modulos.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface p-6 text-sm text-text-secondary">
           Esta turma ainda não tem módulos cadastrados.
         </p>
+      ) : (
+        <section aria-labelledby="titulo-domingos" className="space-y-3">
+          <h3 id="titulo-domingos" className="font-display text-base font-semibold text-primary">
+            Domingos
+          </h3>
+
+          {aulas.length === 0 ? (
+            <p className="rounded-xl border border-border bg-surface p-6 text-sm text-text-secondary">
+              Nenhuma data aberta ainda.
+            </p>
+          ) : (
+            <div className="rounded-xl border border-border bg-surface">
+              {aulas.map((aula, i) => {
+                const resumo = resumoPorAula.get(aula.id);
+                const total = resumo?.presentes.length ?? 0;
+                return (
+                  <details
+                    key={aula.id}
+                    open={aula.id === aulaAtual?.id}
+                    className={i > 0 ? "border-t border-border-light" : ""}
+                  >
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-3 hover:bg-bg [&::-webkit-details-marker]:hidden">
+                      <span className="text-sm font-medium text-text-primary">
+                        {rotuloDomingo(aula.data)}
+                      </span>
+                      <span
+                        className={`text-sm ${
+                          resumo?.temChamada ? "font-semibold text-primary" : "text-text-secondary"
+                        }`}
+                      >
+                        {resumo?.temChamada
+                          ? `${total} ${total === 1 ? "presente" : "presentes"}`
+                          : "sem chamada"}
+                      </span>
+                    </summary>
+
+                    <div className="px-5 pb-4">
+                      {resumo && resumo.presentes.length > 0 ? (
+                        <ul className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                          {resumo.presentes.map((p) => (
+                            <li key={p.id}>{p.nome}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-text-secondary">
+                          {resumo?.temChamada ? "Ninguém marcado como presente." : "A chamada desta data ainda não foi lançada."}
+                        </p>
+                      )}
+                      <a
+                        href={`${baseUrl}?turma=${turmaAtual.id}&aula=${aula.id}#chamada`}
+                        className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
+                      >
+                        {resumo?.temChamada ? "Editar chamada desta data" : "Lançar chamada desta data"}
+                      </a>
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          )}
+
+          <details className="rounded-xl border border-border bg-surface p-4">
+            <summary className="cursor-pointer text-sm font-medium text-primary">
+              Abrir nova data
+            </summary>
+            <div className="mt-3">
+              <NovaDataForm modulos={modulos} />
+            </div>
+          </details>
+        </section>
       )}
 
-      {modulos.map((modulo) => {
-        const aulasDoModulo = aulas.filter((a) => a.modulo_id === modulo.id);
-        return (
-          <div key={modulo.id} className="rounded-xl border border-border bg-surface p-5">
-            <div className="font-display text-base font-semibold">
-              Módulo {modulo.numero}
-              {modulo.tema && <span className="font-normal text-text-secondary"> · {modulo.tema}</span>}
-            </div>
-
-            {aulasDoModulo.length === 0 ? (
-              <p className="mt-2 text-sm text-text-secondary">Nenhuma aula lançada ainda.</p>
-            ) : (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {aulasDoModulo.map((aula) => (
-                  <a
-                    key={aula.id}
-                    href={`${baseUrl}?turma=${turmaAtual.id}&aula=${aula.id}`}
-                    className={`rounded-lg px-3 py-1.5 text-sm ${
-                      aula.id === aulaAtual?.id
-                        ? "bg-accent text-white"
-                        : "border border-border-light bg-bg text-text-primary"
-                    }`}
-                  >
-                    {new Date(aula.data + "T00:00:00").toLocaleDateString("pt-BR")}
-                    {aula.titulo ? ` · ${aula.titulo}` : ""}
-                  </a>
-                ))}
-              </div>
-            )}
-
-            <NovaAulaForm modulo={modulo} />
-          </div>
-        );
-      })}
-
       {aulaAtual && (
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div id="chamada" className="scroll-mt-6 rounded-xl border border-border bg-surface p-5">
           <div className="font-display text-base font-semibold text-primary">
             Chamada — {new Date(aulaAtual.data + "T00:00:00").toLocaleDateString("pt-BR")}
             {aulaAtual.titulo ? ` · ${aulaAtual.titulo}` : ""}
