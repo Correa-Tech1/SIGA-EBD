@@ -22,11 +22,11 @@ export default function LoginPage() {
   const [estado, acao] = useFormState(entrar, estadoInicial);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-primary px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-primary px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="mb-7 text-center">
-          <div className="font-display text-2xl font-semibold text-white">SIGA EBD</div>
-          <div className="mt-1 text-xs text-white/70">
+        <div className="mb-7 flex flex-col items-center text-center">
+          <img src="/logo-siga-ebd.svg" alt="SIGA EBD" className="h-16 w-auto" />
+          <div className="mt-2 text-xs text-white/70">
             Sistema Integrado de Gestão e Auxílio da EBD
           </div>
         </div>
@@ -77,6 +77,15 @@ export default function LoginPage() {
           </a>
           .
         </p>
+      </div>
+
+      <div className="mt-10 flex items-center justify-center gap-3">
+        <span className="text-xs text-white/55">O Sistema foi desenvolvido pela</span>
+        <img
+          src="/logo-correa-tech.svg"
+          alt="Correa Tech"
+          className="h-9 w-auto opacity-85 brightness-0 invert"
+        />
       </div>
     </div>
   );

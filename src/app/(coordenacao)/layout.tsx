@@ -17,9 +17,9 @@ export default async function CoordenacaoLayout({
   if (sessao.role !== "coordenacao") redirect("/");
 
   return (
-    <div className="min-h-screen bg-bg">
-      <header className="flex h-[72px] items-center justify-between bg-primary px-10">
-        <div className="font-display text-lg font-semibold text-white">SIGA EBD</div>
+    <div className="flex min-h-screen flex-col bg-bg">
+      <header className="flex h-[72px] shrink-0 items-center justify-between bg-primary px-10">
+        <img src="/logo-siga-ebd.svg" alt="SIGA EBD" className="h-[42px] w-auto" />
         <nav className="flex h-full items-center gap-8 text-sm text-white/70">
           <a href="/dashboard" className="text-white">
             INÍCIO
@@ -27,13 +27,18 @@ export default async function CoordenacaoLayout({
           <a href="/frequencia">FREQUÊNCIA</a>
           <a href="/biblioteca">BIBLIOTECA</a>
           <a href="/escalas">ESCALAS &amp; AVISOS</a>
+          <a href="/auxilio">AUXÍLIO AO PROFESSOR</a>
           <a href="/professores">PROFESSORES</a>
         </nav>
         <div className="text-sm text-white">
           {sessao.nome} <span className="text-white/60">· Coordenação</span>
         </div>
       </header>
-      <main className="p-10">{children}</main>
+      <main className="flex-grow p-10">{children}</main>
+      <footer className="flex h-16 shrink-0 items-center justify-center gap-3 border-t border-border bg-surface">
+        <span className="text-xs text-text-secondary">O Sistema foi desenvolvido pela</span>
+        <img src="/logo-correa-tech.svg" alt="Correa Tech" className="h-[36px] w-auto" />
+      </footer>
     </div>
   );
 }

@@ -30,13 +30,22 @@ function nomeArquivoSeguro(nomeOriginal: string): string {
   return `${Date.now()}-${limpo}`;
 }
 
-function validarArquivo(arquivo: File | null): string | null {
-  if (!arquivo || arquivo.size === 0) return "Escolha um arquivo.";
-  if (arquivo.size > TAMANHO_MAX_BYTES) return "Arquivo maior que 25MB.";
+function validarArquivo(arquivo: File): string | null {
+  if (arquivo.size === 0) return `"${arquivo.name}": arquivo vazio.`;
+  if (arquivo.size > TAMANHO_MAX_BYTES) return `"${arquivo.name}": maior que 25MB.`;
   if (!TIPOS_ACEITOS.has(extensao(arquivo.name))) {
-    return `Tipo de arquivo ".${extensao(arquivo.name)}" não é aceito.`;
+    return `"${arquivo.name}": tipo ".${extensao(arquivo.name)}" não é aceito.`;
   }
   return null;
+}
+
+// Título de cada arquivo quando vários são enviados de uma vez: usa o nome
+// do próprio arquivo (sem extensão), prefixado pelo título comum se um foi
+// informado — assim dá pra selecionar vários arquivos numa tacada só, sem
+// precisar de um título por arquivo.
+function tituloPara(nomeArquivo: string, prefixoComum: string): string {
+  const semExtensao = nomeArquivo.replace(/\.[^./]+$/, "");
+  return prefixoComum ? `${prefixoComum} — ${semExtensao}` : semExtensao;
 }
 
 export async function enviarMaterialOficial(
@@ -50,37 +59,58 @@ export async function enviarMaterialOficial(
   }
 
   const moduloId = String(formData.get("moduloId") ?? "");
-  const titulo = String(formData.get("titulo") ?? "").trim();
-  const arquivo = formData.get("arquivo") as File | null;
+  const prefixoComum = String(formData.get("titulo") ?? "").trim();
+  const arquivos = formData.getAll("arquivos").filter((a): a is File => a instanceof File && a.size > 0);
 
-  if (!moduloId || !titulo) return { erro: "Escolha o módulo e informe um título." };
-  const erroArquivo = validarArquivo(arquivo);
-  if (erroArquivo) return { erro: erroArquivo };
+  if (!moduloId) return { erro: "Escolha o módulo." };
+  if (arquivos.length === 0) return { erro: "Escolha ao menos um arquivo." };
+  for (const arquivo of arquivos) {
+    const erroArquivo = validarArquivo(arquivo);
+    if (erroArquivo) return { erro: erroArquivo };
+  }
 
-  const caminho = `oficial/${moduloId}/${nomeArquivoSeguro(arquivo!.name)}`;
   const supabase = createClient();
+  const enviados: string[] = [];
 
-  const { error: erroUpload } = await supabase.storage
-    .from("materiais")
-    .upload(caminho, arquivo!, { contentType: arquivo!.type || undefined });
-  if (erroUpload) return { erro: `Falha ao enviar arquivo: ${erroUpload.message}` };
+  for (const arquivo of arquivos) {
+    const titulo = tituloPara(arquivo.name, prefixoComum);
+    const caminho = `oficial/${moduloId}/${nomeArquivoSeguro(arquivo.name)}`;
 
-  const { error: erroInsert } = await supabase.from("materiais").insert({
-    origem: "oficial",
-    modulo_id: moduloId,
-    titulo,
-    tipo_arquivo: extensao(arquivo!.name),
-    caminho_arquivo: caminho,
-  });
+    const { error: erroUpload } = await supabase.storage
+      .from("materiais")
+      .upload(caminho, arquivo, { contentType: arquivo.type || undefined });
+    if (erroUpload) {
+      return {
+        erro: `Falha ao enviar "${arquivo.name}": ${erroUpload.message}${
+          enviados.length ? ` (${enviados.length} arquivo(s) já publicado(s) antes deste)` : ""
+        }`,
+      };
+    }
 
-  if (erroInsert) {
-    await supabase.storage.from("materiais").remove([caminho]);
-    return { erro: `Falha ao registrar material: ${erroInsert.message}` };
+    const { error: erroInsert } = await supabase.from("materiais").insert({
+      origem: "oficial",
+      modulo_id: moduloId,
+      titulo,
+      tipo_arquivo: extensao(arquivo.name),
+      caminho_arquivo: caminho,
+    });
+
+    if (erroInsert) {
+      await supabase.storage.from("materiais").remove([caminho]);
+      return { erro: `Falha ao registrar "${arquivo.name}": ${erroInsert.message}` };
+    }
+
+    enviados.push(titulo);
   }
 
   revalidatePath("/biblioteca");
   revalidatePath("/aba-aluno");
-  return { sucesso: `"${titulo}" publicado na Biblioteca.` };
+  return {
+    sucesso:
+      enviados.length === 1
+        ? `"${enviados[0]}" publicado na Biblioteca.`
+        : `${enviados.length} materiais publicados na Biblioteca.`,
+  };
 }
 
 export async function enviarMaterialDeAula(
@@ -95,43 +125,55 @@ export async function enviarMaterialDeAula(
   }
 
   const aulaId = String(formData.get("aulaId") ?? "");
-  const titulo = String(formData.get("titulo") ?? "").trim();
-  const arquivo = formData.get("arquivo") as File | null;
+  const prefixoComum = String(formData.get("titulo") ?? "").trim();
+  const arquivos = formData.getAll("arquivos").filter((a): a is File => a instanceof File && a.size > 0);
 
-  if (!aulaId || !titulo) return { erro: "Escolha a aula e informe um título." };
-  const erroArquivo = validarArquivo(arquivo);
-  if (erroArquivo) return { erro: erroArquivo };
-
-  const caminho = `de_aula/${aulaId}/${nomeArquivoSeguro(arquivo!.name)}`;
-  const supabase = createClient();
-
-  const { error: erroUpload } = await supabase.storage
-    .from("materiais")
-    .upload(caminho, arquivo!, { contentType: arquivo!.type || undefined });
-  if (erroUpload) {
-    return {
-      erro: `Falha ao enviar arquivo (confira se esta aula é da sua turma): ${erroUpload.message}`,
-    };
+  if (!aulaId) return { erro: "Escolha a aula." };
+  if (arquivos.length === 0) return { erro: "Escolha ao menos um arquivo." };
+  for (const arquivo of arquivos) {
+    const erroArquivo = validarArquivo(arquivo);
+    if (erroArquivo) return { erro: erroArquivo };
   }
 
-  const { error: erroInsert } = await supabase.from("materiais").insert({
-    origem: "de_aula",
-    aula_id: aulaId,
-    enviado_por: sessao.pessoaId,
-    titulo,
-    tipo_arquivo: extensao(arquivo!.name),
-    caminho_arquivo: caminho,
-  });
+  const supabase = createClient();
+  const enviados: string[] = [];
 
-  if (erroInsert) {
-    await supabase.storage.from("materiais").remove([caminho]);
-    return { erro: `Falha ao registrar material: ${erroInsert.message}` };
+  for (const arquivo of arquivos) {
+    const titulo = tituloPara(arquivo.name, prefixoComum);
+    const caminho = `de_aula/${aulaId}/${nomeArquivoSeguro(arquivo.name)}`;
+
+    const { error: erroUpload } = await supabase.storage
+      .from("materiais")
+      .upload(caminho, arquivo, { contentType: arquivo.type || undefined });
+    if (erroUpload) {
+      return {
+        erro: `Falha ao enviar "${arquivo.name}" (confira se esta aula é da sua turma): ${erroUpload.message}`,
+      };
+    }
+
+    const { error: erroInsert } = await supabase.from("materiais").insert({
+      origem: "de_aula",
+      aula_id: aulaId,
+      enviado_por: sessao.pessoaId,
+      titulo,
+      tipo_arquivo: extensao(arquivo.name),
+      caminho_arquivo: caminho,
+    });
+
+    if (erroInsert) {
+      await supabase.storage.from("materiais").remove([caminho]);
+      return { erro: `Falha ao registrar "${arquivo.name}": ${erroInsert.message}` };
+    }
+
+    enviados.push(titulo);
   }
 
   revalidatePath("/minha-turma");
   revalidatePath("/frequencia");
   revalidatePath("/biblioteca");
-  return { sucesso: `"${titulo}" enviado.` };
+  return {
+    sucesso: enviados.length === 1 ? `"${enviados[0]}" enviado.` : `${enviados.length} arquivos enviados.`,
+  };
 }
 
 export async function apagarMaterial(

@@ -42,19 +42,19 @@ export function UploadMaterialOficialForm({ moduloId }: { moduloId: string }) {
     <form action={acao} className="mt-3 flex flex-wrap items-end gap-3 rounded-lg bg-bg p-3">
       <input type="hidden" name="moduloId" value={moduloId} />
       <div className="min-w-[200px] flex-1">
-        <label className="mb-1 block text-xs text-text-secondary">TÍTULO</label>
+        <label className="mb-1 block text-xs text-text-secondary">TÍTULO (opcional)</label>
         <input
           name="titulo"
-          required
-          placeholder="Ex.: Estudo — Módulo 1"
+          placeholder="Ex.: Estudo — Módulo 1 (em branco usa o nome de cada arquivo)"
           className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs text-text-secondary">ARQUIVO</label>
+        <label className="mb-1 block text-xs text-text-secondary">ARQUIVOS</label>
         <input
-          name="arquivo"
+          name="arquivos"
           type="file"
+          multiple
           required
           className="rounded-lg border border-border bg-surface px-3 py-2 text-sm file:mr-2 file:rounded file:border-0 file:bg-primary file:px-2 file:py-1 file:text-xs file:text-white"
         />
@@ -71,19 +71,19 @@ export function UploadMaterialDeAulaForm({ aulaId }: { aulaId: string }) {
     <form action={acao} className="mt-3 flex flex-wrap items-end gap-3 rounded-lg bg-bg p-3">
       <input type="hidden" name="aulaId" value={aulaId} />
       <div className="min-w-[200px] flex-1">
-        <label className="mb-1 block text-xs text-text-secondary">TÍTULO</label>
+        <label className="mb-1 block text-xs text-text-secondary">TÍTULO (opcional)</label>
         <input
           name="titulo"
-          required
-          placeholder="Ex.: Slides da aula"
+          placeholder="Ex.: Slides da aula (em branco usa o nome de cada arquivo)"
           className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs text-text-secondary">ARQUIVO</label>
+        <label className="mb-1 block text-xs text-text-secondary">ARQUIVOS</label>
         <input
-          name="arquivo"
+          name="arquivos"
           type="file"
+          multiple
           required
           className="rounded-lg border border-border bg-surface px-3 py-2 text-sm file:mr-2 file:rounded file:border-0 file:bg-primary file:px-2 file:py-1 file:text-xs file:text-white"
         />

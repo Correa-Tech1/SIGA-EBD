@@ -20,9 +20,12 @@ insert into storage.buckets (id, name, public)
 values ('materiais', 'materiais', true)
 on conflict (id) do nothing;
 
--- Supabase já habilita RLS em storage.objects por padrão; garantir aqui é
--- inofensivo (idempotente) caso o projeto tenha sido criado de outro jeito.
-alter table storage.objects enable row level security;
+-- NÃO rodar "alter table storage.objects enable row level security" aqui:
+-- o Supabase já habilita RLS nessa tabela por padrão, e como ela pertence a
+-- um role interno (supabase_storage_admin), o role usado pelo SQL Editor
+-- não tem posse dela — tentar (re)habilitar dá "must be owner of table
+-- objects" (42501). CREATE POLICY abaixo funciona normalmente mesmo assim
+-- (o Supabase concede esse privilégio específico à parte).
 
 -- Leitura: pública de verdade (bucket "public" já serve os arquivos direto
 -- por URL, sem passar por RLS nenhum — mas a policy de SELECT continua
