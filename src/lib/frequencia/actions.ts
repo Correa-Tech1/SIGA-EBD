@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { exigirCoordenacao, exigirProfessorOuCoordenacao } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,18 +33,29 @@ export async function criarAula(
   }
 
   const supabase = createClient();
-  const { error } = await supabase.from("aulas").insert({
-    modulo_id: moduloId,
-    data,
-    titulo: titulo || null,
-  });
+  const { data: criada, error } = await supabase
+    .from("aulas")
+    .insert({
+      modulo_id: moduloId,
+      data,
+      titulo: titulo || null,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    return { erro: `Falha ao criar aula: ${error.message}` };
+  if (error || !criada) {
+    return { erro: `Falha ao criar aula: ${error?.message ?? "sem retorno"}` };
   }
 
   revalidatePath("/frequencia");
   revalidatePath("/minha-turma");
+
+  // Formulário "Lançar novo domingo": cai direto na chamada da data criada.
+  const voltarPara = String(formData.get("voltarPara") ?? "");
+  const turmaId = String(formData.get("turmaId") ?? "");
+  if (turmaId && /^\/[a-z0-9-]+$/i.test(voltarPara)) {
+    redirect(`${voltarPara}?turma=${encodeURIComponent(turmaId)}&aula=${criada.id}#chamada`);
+  }
   return { sucesso: "Aula criada." };
 }
 

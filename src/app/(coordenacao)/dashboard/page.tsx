@@ -1,157 +1,106 @@
 import { getSessaoAtual } from "@/lib/auth/session";
-import {
-  seriesPorTurma,
-  serieGeral,
-  resumir,
-  corDaTurma,
-} from "@/lib/frequencia/metricas";
-import { GraficoFrequencia } from "@/components/dashboard/GraficoFrequencia";
+import { carregarRelatorio } from "@/lib/relatorio/dados";
+import { corDaTurma } from "@/lib/relatorio/cores";
+import { fmtDataCurta, fmtNum, fmtPct } from "@/lib/relatorio/motor";
+import { GraficoLinhas } from "@/components/relatorio/GraficoLinhas";
+import { KpiColorido } from "@/components/relatorio/Blocos";
 
-function formatarData(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return `${dia}/${mes}/${ano}`;
-}
+// Início: apresentação da EBD + um único painel colorido com os números
+// gerais + o gráfico de linhas (uma cor por turma). Os detalhes ficam na
+// aba Frequência.
+export default async function DashboardPage() {
+  const [sessao, { relatorio: r, semestre }] = await Promise.all([getSessaoAtual(), carregarRelatorio()]);
 
-function formatarNumero(n: number): string {
-  return n.toFixed(1).replace(".", ",");
-}
+  // presentes por domingo somando as turmas
+  const porData = new Map<string, number>();
+  for (const t of r.turmas) for (const d of t.datas) porData.set(d.data, (porData.get(d.data) ?? 0) + d.presentes);
+  const totais = [...porData.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const mediaGeral = totais.length ? totais.reduce((s, [, v]) => s + v, 0) / totais.length : 0;
+  const ultimo = totais[totais.length - 1];
+  const pctAdultos = r.igreja.adultos ? (r.igreja.passaram / r.igreja.adultos) * 100 : 0;
 
-// Painel inicial da coordenação. Sem turma selecionada mostra o geral (todas
-// as turmas empilhadas por domingo); com `?turma=<id>` mostra só a turma.
-// Referência visual: board "Main.dc.html" nos mockups (Design canvas).
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: { turma?: string };
-}) {
-  const [sessao, series] = await Promise.all([getSessaoAtual(), seriesPorTurma()]);
-
-  const turmaAtual = series.find((s) => s.turma.id === searchParams.turma);
-  const pontos = turmaAtual ? turmaAtual.pontos : serieGeral(series);
-  const resumo = resumir(pontos);
-
-  const datas = pontos.map((p) => p.data);
-  const seriesGrafico = turmaAtual
-    ? [
-        {
-          nome: turmaAtual.turma.nome,
-          cor: corDaTurma(turmaAtual.turma.nome),
-          valores: pontos.map((p) => p.presentes),
-        },
-      ]
-    : series.map((s) => {
-        const porData = new Map(s.pontos.map((p) => [p.data, p.presentes]));
-        return {
-          nome: s.turma.nome,
-          cor: corDaTurma(s.turma.nome),
-          valores: datas.map((d) => porData.get(d) ?? 0),
-        };
-      });
-
-  const titulo = turmaAtual
-    ? `${turmaAtual.turma.nome}${turmaAtual.turma.titulo ? ` · ${turmaAtual.turma.titulo}` : ""}`
-    : "Geral — todas as turmas";
-
-  const atalhos = [
-    { href: "/frequencia", titulo: "Frequência", descricao: "Domingos, lista de presentes e chamada." },
-    { href: "/biblioteca", titulo: "Biblioteca", descricao: "Material oficial de cada módulo." },
-    { href: "/escalas", titulo: "Escalas & Avisos", descricao: "Quem dá aula quando, e o mural." },
-    { href: "/professores", titulo: "Professores", descricao: "Criar e resetar contas." },
-  ];
-
-  const kpis = [
-    { rotulo: "Média por domingo", valor: formatarNumero(resumo.media) },
-    {
-      rotulo: "Último domingo",
-      valor: resumo.ultimo ? String(resumo.ultimo.presentes) : "—",
-      detalhe: resumo.ultimo ? formatarData(resumo.ultimo.data) : undefined,
-    },
-    {
-      rotulo: "Melhor domingo",
-      valor: resumo.melhor ? String(resumo.melhor.presentes) : "—",
-      detalhe: resumo.melhor ? formatarData(resumo.melhor.data) : undefined,
-    },
-    { rotulo: "Domingos com chamada", valor: String(resumo.domingos) },
-  ];
+  const periodo = semestre ? `${semestre.periodo}º semestre de ${semestre.ano}` : "Semestre atual";
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-primary">Olá, {sessao.nome}</h1>
-        <p className="mt-1 text-sm text-text-secondary">
-          {series.length === 0
-            ? "Nenhuma turma cadastrada ainda — comece pela Frequência."
-            : "Frequência do semestre"}
+      <section className="rounded-2xl bg-surface p-8 shadow-sm ring-1 ring-border">
+        <p className="text-sm text-text-secondary">Olá, {sessao.nome}</p>
+        <h1 className="mt-1 font-display text-3xl font-semibold text-primary">
+          Escola Bíblica Dominical
+        </h1>
+        <p className="mt-1 font-display text-lg text-text-secondary">
+          Assembleia de Deus Dom Pedro II · Anápolis-GO · {periodo}
         </p>
-      </div>
-
-      {series.length > 0 && (
-        <section aria-labelledby="titulo-frequencia" className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <a
-              href="/dashboard"
-              aria-current={!turmaAtual ? "page" : undefined}
-              className={`rounded-full px-4 py-1.5 text-sm ${
-                !turmaAtual
-                  ? "bg-primary text-white"
-                  : "border border-border bg-surface text-text-secondary"
-              }`}
+        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-text-secondary">
+          A EBD é o lugar onde a igreja se reúne aos domingos para estudar a Palavra por classe e
+          por fase de vida. Neste semestre, {r.turmas.length}{" "}
+          {r.turmas.length === 1 ? "turma de adultos caminha" : "turmas de adultos caminham"} juntas:
+        </p>
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {r.turmas.map((t) => (
+            <li
+              key={t.turma.id}
+              className="rounded-full px-4 py-1.5 text-sm font-medium text-white"
+              style={{ background: corDaTurma(t.turma.nome) }}
             >
-              Geral
+              {t.turma.nome}
+              {t.turma.titulo ? ` · ${t.turma.titulo}` : ""}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {r.aulas === 0 ? (
+        <p className="rounded-xl border border-border bg-surface p-6 text-sm text-text-secondary">
+          Nenhuma chamada lançada ainda. Comece pela aba Frequência.
+        </p>
+      ) : (
+        <>
+          <section aria-label="Números gerais" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <KpiColorido
+              fundo="#0E7C86"
+              rotulo="Pessoas na EBD"
+              valor={String(r.distintas)}
+              detalhe={`${r.membros} membros · ${r.visitantes} visitantes`}
+            />
+            <KpiColorido
+              fundo="#F2542D"
+              rotulo="Presentes por domingo"
+              valor={fmtNum(mediaGeral)}
+              detalhe={ultimo ? `último domingo (${fmtDataCurta(ultimo[0])}): ${ultimo[1]}` : undefined}
+            />
+            <KpiColorido
+              fundo="#D9930D"
+              rotulo="Frequentes (4+ aulas)"
+              valor={String(r.frequentes)}
+              detalhe={`${r.esporadicos} esporádicos · ${r.umaVez} só uma vez`}
+            />
+            <KpiColorido
+              fundo="#101E24"
+              rotulo="Adultos da igreja na EBD"
+              valor={fmtPct(pctAdultos)}
+              detalhe={`${r.igreja.passaram} de ${r.igreja.adultos} adultos · ${r.aulas} domingos`}
+            />
+          </section>
+
+          <section aria-labelledby="titulo-linha" className="space-y-3">
+            <h2 id="titulo-linha" className="font-display text-lg font-semibold text-primary">
+              Presença por domingo
+            </h2>
+            <GraficoLinhas
+              descricao="Presentes por domingo em cada turma."
+              series={r.turmas.map((t) => ({
+                nome: t.turma.nome,
+                cor: corDaTurma(t.turma.nome),
+                pontos: t.datas.map((d) => ({ data: d.data, valor: d.presentes })),
+              }))}
+            />
+            <a href="/frequencia" className="inline-block text-sm font-medium text-primary hover:underline">
+              Ver detalhes na Frequência →
             </a>
-            {series.map((s) => (
-              <a
-                key={s.turma.id}
-                href={`/dashboard?turma=${s.turma.id}`}
-                aria-current={turmaAtual?.turma.id === s.turma.id ? "page" : undefined}
-                className={`rounded-full px-4 py-1.5 text-sm ${
-                  turmaAtual?.turma.id === s.turma.id
-                    ? "bg-primary text-white"
-                    : "border border-border bg-surface text-text-secondary"
-                }`}
-              >
-                {s.turma.nome}
-              </a>
-            ))}
-          </div>
-
-          <h2 id="titulo-frequencia" className="font-display text-lg font-semibold text-primary">
-            {titulo}
-          </h2>
-
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {kpis.map((k) => (
-              <div key={k.rotulo} className="rounded-xl border border-border bg-surface p-4">
-                <div className="text-xs text-text-secondary">{k.rotulo}</div>
-                <div className="mt-1 font-display text-2xl font-semibold text-primary">
-                  {k.valor}
-                </div>
-                {k.detalhe && <div className="text-xs text-text-secondary">{k.detalhe}</div>}
-              </div>
-            ))}
-          </div>
-
-          <GraficoFrequencia
-            datas={datas}
-            series={seriesGrafico}
-            media={resumo.media}
-            descricao={`Presentes por domingo — ${titulo}. Média de ${formatarNumero(resumo.media)}.`}
-          />
-        </section>
+          </section>
+        </>
       )}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {atalhos.map((a) => (
-          <a
-            key={a.href}
-            href={a.href}
-            className="rounded-xl border border-border bg-surface p-5 hover:border-primary"
-          >
-            <div className="font-display text-base font-semibold text-primary">{a.titulo}</div>
-            <div className="mt-1 text-sm text-text-secondary">{a.descricao}</div>
-          </a>
-        ))}
-      </div>
     </div>
   );
 }

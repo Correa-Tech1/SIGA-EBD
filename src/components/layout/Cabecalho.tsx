@@ -26,7 +26,7 @@ export function Cabecalho({
   const pathname = usePathname();
 
   return (
-    <header className="flex h-20 shrink-0 items-center justify-between bg-primary px-10">
+    <header className="flex h-20 print:hidden shrink-0 items-center justify-between bg-primary px-10">
       <a href={itens[0]?.href ?? "/"} aria-label="SIGA EBD — início">
         <img src="/logo-siga-ebd.svg" alt="SIGA EBD" className="h-14 w-auto" />
       </a>

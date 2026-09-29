@@ -72,10 +72,20 @@ export function NovaAulaForm({ modulo }: { modulo: Modulo }) {
 }
 
 // Abrir uma data nova (um domingo) sem digitar título: só módulo + data.
-export function NovaDataForm({ modulos }: { modulos: Modulo[] }) {
+export function NovaDataForm({
+  modulos,
+  turmaId,
+  baseUrl,
+}: {
+  modulos: Modulo[];
+  turmaId: string;
+  baseUrl: string;
+}) {
   const [estado, acao] = useFormState(criarAula, estadoInicial);
   return (
     <form action={acao} className="flex flex-wrap items-end gap-3 rounded-lg bg-bg p-3">
+      <input type="hidden" name="turmaId" value={turmaId} />
+      <input type="hidden" name="voltarPara" value={baseUrl} />
       <div>
         <label className="mb-1 block text-xs text-text-secondary">DATA (DOMINGO)</label>
         <input
@@ -100,7 +110,7 @@ export function NovaDataForm({ modulos }: { modulos: Modulo[] }) {
           ))}
         </select>
       </div>
-      <Botao texto="Abrir data" textoCarregando="Criando…" />
+      <Botao texto="Abrir chamada" textoCarregando="Criando…" />
       <Mensagens estado={estado} />
     </form>
   );

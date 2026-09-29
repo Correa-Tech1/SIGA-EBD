@@ -22,7 +22,7 @@ export default async function CoordenacaoLayout({
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <Cabecalho itens={MENU_COORDENACAO} nome={sessao.nome} papel="Coordenação" />
-      <main className="flex-grow p-10">{children}</main>
+      <main className="flex-grow p-10 print:p-0">{children}</main>
       <Rodape />
     </div>
   );

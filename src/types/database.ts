@@ -29,6 +29,8 @@ export interface Database {
           tipo: PessoaTipo;
           role: PessoaRole | null;
           telefone: string | null;
+          data_nascimento: string | null;
+          genero: "M" | "F" | null;
           criado_em: string;
         },
         "nome"

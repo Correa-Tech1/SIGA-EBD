@@ -17,6 +17,9 @@ import { listarMateriaisDeAula } from "@/lib/biblioteca/queries";
 import { ListaMateriais } from "@/components/biblioteca/ListaMateriais";
 import { UploadMaterialDeAulaForm } from "@/components/biblioteca/ClientForms";
 import { getSessaoAtual } from "@/lib/auth/session";
+import type { RelatorioGeral } from "@/lib/relatorio/motor";
+import { corDaTurma } from "@/lib/relatorio/cores";
+import { ResumoTurma } from "./ResumoTurma";
 
 function rotuloDomingo(dataIso: string): string {
   const data = new Date(dataIso + "T00:00:00");
@@ -36,12 +39,15 @@ export async function PainelFrequencia({
   aulaSelecionadaId,
   podeGerenciarMatricula,
   baseUrl,
+  relatorio,
 }: {
   turmas: Turma[];
   turmaSelecionadaId: string | undefined;
   aulaSelecionadaId: string | undefined;
   podeGerenciarMatricula: boolean;
   baseUrl: string;
+  // só a coordenação passa: números da turma (idade, gênero) não vão ao professor
+  relatorio?: RelatorioGeral;
 }) {
   if (turmas.length === 0) {
     return (
@@ -54,7 +60,10 @@ export async function PainelFrequencia({
   const turmaAtual = turmas.find((t) => t.id === turmaSelecionadaId) ?? turmas[0];
   const modulos = await listarModulos(turmaAtual.id);
   const moduloIds = modulos.map((m) => m.id);
-  const aulas = await listarAulasDosModulos(moduloIds);
+  // do primeiro domingo do semestre para o último
+  const aulas = (await listarAulasDosModulos(moduloIds)).sort((a, b) => a.data.localeCompare(b.data));
+
+  const relatorioTurma = relatorio?.turmas.find((t) => t.turma.id === turmaAtual.id);
 
   const aulaAtual = aulaSelecionadaId ? aulas.find((a) => a.id === aulaSelecionadaId) : undefined;
 
@@ -67,6 +76,11 @@ export async function PainelFrequencia({
     listarResumoPresencas(aulas.map((a) => a.id)),
   ]);
 
+  // Só entram na lista as datas que já têm nomes (chamada lançada), do primeiro
+  // domingo do semestre para baixo. Datas abertas sem chamada ficam à parte.
+  const aulasComChamada = aulas.filter((a) => resumoPorAula.get(a.id)?.temChamada);
+  const aulasPendentes = aulas.filter((a) => !resumoPorAula.get(a.id)?.temChamada);
+
   return (
     <div className="space-y-6">
       {turmas.length > 1 && (
@@ -75,10 +89,10 @@ export async function PainelFrequencia({
             <a
               key={t.id}
               href={`${baseUrl}?turma=${t.id}`}
+              aria-current={t.id === turmaAtual.id ? "page" : undefined}
+              style={t.id === turmaAtual.id ? { background: corDaTurma(t.nome), color: "#fff" } : undefined}
               className={`rounded-full px-4 py-1.5 text-sm ${
-                t.id === turmaAtual.id
-                  ? "bg-primary text-white"
-                  : "border border-border bg-surface text-text-secondary"
+                t.id === turmaAtual.id ? "" : "border border-border bg-surface text-text-secondary"
               }`}
             >
               {t.nome}
@@ -96,7 +110,17 @@ export async function PainelFrequencia({
             </span>
           )}
         </h2>
+        {relatorio && (
+          <a
+            href={`${baseUrl}/relatorio?turma=${turmaAtual.id}`}
+            className="mt-1 inline-block text-sm font-medium text-primary hover:underline"
+          >
+            Gerar relatório desta turma →
+          </a>
+        )}
       </div>
+
+      {relatorioTurma && <ResumoTurma t={relatorioTurma} />}
 
       {modulos.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface p-6 text-sm text-text-secondary">
@@ -108,13 +132,13 @@ export async function PainelFrequencia({
             Domingos
           </h3>
 
-          {aulas.length === 0 ? (
+          {aulasComChamada.length === 0 ? (
             <p className="rounded-xl border border-border bg-surface p-6 text-sm text-text-secondary">
-              Nenhuma data aberta ainda.
+              Nenhuma chamada lançada ainda. Use “Lançar novo domingo” abaixo.
             </p>
           ) : (
             <div className="rounded-xl border border-border bg-surface">
-              {aulas.map((aula, i) => {
+              {aulasComChamada.map((aula, i) => {
                 const resumo = resumoPorAula.get(aula.id);
                 const total = resumo?.presentes.length ?? 0;
                 return (
@@ -163,12 +187,29 @@ export async function PainelFrequencia({
             </div>
           )}
 
-          <details className="rounded-xl border border-border bg-surface p-4">
+          {aulasPendentes.length > 0 && (
+            <div className="rounded-xl border border-dashed border-border bg-surface p-4 text-sm">
+              <div className="mb-2 text-text-secondary">Datas abertas, aguardando chamada:</div>
+              <div className="flex flex-wrap gap-2">
+                {aulasPendentes.map((a) => (
+                  <a
+                    key={a.id}
+                    href={`${baseUrl}?turma=${turmaAtual.id}&aula=${a.id}#chamada`}
+                    className="rounded-full border border-border px-3 py-1 text-primary hover:bg-bg"
+                  >
+                    {rotuloDomingo(a.data)}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <details className="rounded-xl border border-border bg-surface p-4" open={aulasComChamada.length === 0}>
             <summary className="cursor-pointer text-sm font-medium text-primary">
-              Abrir nova data
+              Lançar novo domingo
             </summary>
             <div className="mt-3">
-              <NovaDataForm modulos={modulos} />
+              <NovaDataForm modulos={modulos} turmaId={turmaAtual.id} baseUrl={baseUrl} />
             </div>
           </details>
         </section>
