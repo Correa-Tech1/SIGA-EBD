@@ -4,39 +4,46 @@
 -- chamadas já feitas de 02/08 a 20/09/2026 (planilha FREQUENCIA EBD POR
 -- CLASSES E DATAS).
 --
--- Rode UMA vez no SQL Editor do Supabase. É repetível: nada é duplicado se
--- rodar de novo (pessoas, aulas, matrículas e presenças checam antes).
--- Se algum nome da chamada não achar uma pessoa, ou achar duas, o script
--- PARA com a lista dos nomes e não grava nada — corrija e rode de novo.
+-- Rode UMA vez no SQL Editor do Supabase (cole tudo e clique em Run).
+-- Toda a carga é UM ÚNICO bloco (do $carga$ ... $carga$): ou grava tudo, ou
+-- não grava nada. É repetível: rodar de novo não duplica pessoa, aula,
+-- matrícula nem presença.
+-- Se algum nome da chamada não achar pessoa, ou achar duas, o bloco PARA com
+-- a lista dos nomes — corrija e rode de novo.
 --
 -- Só nome e telefone vêm da planilha de membros; CPF, endereço e demais
 -- dados pessoais NÃO são carregados.
 -- ============================================================================
 
-begin;
+do $carga$
+declare
+  sem_pessoa text;
+  duplicados text;
+begin
 
--- 1) Turma Panorama Bíblico (terceira turma) + módulo 1, se ainda não existir
-insert into turmas (semestre_id, nome, titulo)
-select s.id, 'Panorama Bíblico', null
-from semestres s
-where s.ano = 2026 and s.periodo = 2
-  and not exists (
-    select 1 from turmas t where t.semestre_id = s.id and t.nome = 'Panorama Bíblico'
-  );
+  -- 1) Turma Panorama Bíblico (terceira turma) + módulo 1, se ainda não existir
+  insert into turmas (semestre_id, nome, titulo)
+  select s.id, 'Panorama Bíblico', null
+  from semestres s
+  where s.ano = 2026 and s.periodo = 2
+    and not exists (
+      select 1 from turmas t where t.semestre_id = s.id and t.nome = 'Panorama Bíblico'
+    );
 
-insert into modulos (turma_id, numero, tema)
-select t.id, 1, null
-from turmas t
-join semestres s on s.id = t.semestre_id
-where s.ano = 2026 and s.periodo = 2 and t.nome = 'Panorama Bíblico'
-  and not exists (select 1 from modulos m where m.turma_id = t.id and m.numero = 1);
+  insert into modulos (turma_id, numero, tema)
+  select t.id, 1, null
+  from turmas t
+  join semestres s on s.id = t.semestre_id
+  where s.ano = 2026 and s.periodo = 2 and t.nome = 'Panorama Bíblico'
+    and not exists (select 1 from modulos m where m.turma_id = t.id and m.numero = 1);
 
--- 2) Membros (313 da planilha). Quem já existe (mesmo nome, sem
---    diferenciar maiúscula) é mantido como está — por exemplo a sua conta de
---    coordenação, que entra na planilha como "Matheus Fellipe…".
-insert into pessoas (nome, tipo, telefone)
-select v.nome, 'membro'::pessoa_tipo, v.telefone
-from (values
+  -- 2) Membros (315: 313 da planilha + 2 que estão nas chamadas mas fora do cadastro).
+  --    Quem já existe (mesmo nome, sem diferenciar maiúscula) é mantido como
+  --    está — por exemplo a sua conta de coordenação, que na planilha aparece
+  --    como "Matheus Fellipe…".
+  insert into pessoas (nome, tipo, telefone)
+  select v.nome, 'membro'::pessoa_tipo, v.telefone
+  from (values
   ('Adriano da Silva Rodrigues', '+5562994782597'),
   ('Adryan Henrique Gomes Da Silva', null),
   ('Ágatha Vitória da Silva Oliveira', null),
@@ -349,198 +356,191 @@ from (values
   ('Wilton Pereira dos Santos', '+5562994359738'),
   ('Yasmin Vitória Gonçalves Mendes', '+5562994733339'),
   ('Yasmin Vitória Mendes da Silva', '+5562993286186'),
-  ('Yohann Pietro Nunes Soares Xavier', '+5562993072890')
-) as v(nome, telefone)
-where not exists (select 1 from pessoas p where lower(p.nome) = lower(v.nome));
+  ('Yohann Pietro Nunes Soares Xavier', '+5562993072890'),
+  ('Vanusa Alves Santos', null),
+  ('Wemerson Correa', null)
+  ) as v(nome, telefone)
+  where not exists (select 1 from pessoas p where lower(p.nome) = lower(v.nome));
 
--- 3) Nomes das chamadas que NÃO estão na planilha de membros. Entram como
---    'visitante' (aparecem na chamada, mas não contam como membro). Se algum
---    for membro com o nome escrito diferente, troque o tipo depois.
-insert into pessoas (nome, tipo, telefone)
-select v.nome, 'visitante'::pessoa_tipo, v.telefone
-from (values
+  -- 3) Nomes das chamadas que não são membros: entram como 'visitante'.
+  insert into pessoas (nome, tipo, telefone)
+  select v.nome, 'visitante'::pessoa_tipo, v.telefone
+  from (values
   ('Jéssica Alves', null),
   ('Junior Pereira', null),
   ('Nínive Santos', null),
-  ('Thais Vitória', null),
-  ('Vanusa Alves Santos', null),
-  ('Wermerson Correa', null)
-) as v(nome, telefone)
-where not exists (select 1 from pessoas p where lower(p.nome) = lower(v.nome));
+  ('Thais Vitória', null)
+  ) as v(nome, telefone)
+  where not exists (select 1 from pessoas p where lower(p.nome) = lower(v.nome));
 
--- 4) Chamadas: uma linha por presente (162 presenças em 21 chamadas)
-create temp table _carga (classe text not null, data date not null, nome text not null) on commit drop;
+  -- 4) Chamadas: uma linha por presente (162 presenças em 21 chamadas)
+  create temp table _carga (classe text not null, data date not null, nome text not null) on commit drop;
 
-insert into _carga (classe, data, nome) values
-  ('Mulheres', '2026-08-02', 'Marta Rodrigues Ramos'),
-  ('Mulheres', '2026-08-02', 'Alessia Nascimento'),
-  ('Mulheres', '2026-08-02', 'Sara Aguiar Correa'),
-  ('Mulheres', '2026-08-02', 'Gabrielle Alves Vieira'),
-  ('Mulheres', '2026-08-02', 'Vanusa Alves Santos'),
-  ('Mulheres', '2026-08-02', 'Jéssica Cotrim Cieira'),
-  ('Mulheres', '2026-08-02', 'Jéssica Alves'),
-  ('Mulheres', '2026-08-02', 'Nínive Santos'),
-  ('Homens', '2026-08-02', 'Éder de Souza Ramos'),
-  ('Homens', '2026-08-02', 'Fabio Henrique Nasuno de Paulo'),
-  ('Homens', '2026-08-02', 'Kaio Cesar Albuquerque Cintra'),
-  ('Homens', '2026-08-02', 'Eberson Diniz Correa'),
-  ('Homens', '2026-08-02', 'David Souza Aguiar'),
-  ('Homens', '2026-08-02', 'João Lucas Souza Gondim'),
-  ('Homens', '2026-08-02', 'Alessandro Felis Vieira'),
-  ('Panorama Bíblico', '2026-08-02', 'Carlos Roberto Oliveira'),
-  ('Panorama Bíblico', '2026-08-02', 'Natanael Pereira da Silva'),
-  ('Panorama Bíblico', '2026-08-02', 'Maria de Lurdes Faria'),
-  ('Panorama Bíblico', '2026-08-02', 'Paulo do Santos Pinheiro'),
-  ('Panorama Bíblico', '2026-08-02', 'Caio Silva Palhares'),
-  ('Panorama Bíblico', '2026-08-02', 'Wilton Pereira dos Santos'),
-  ('Panorama Bíblico', '2026-08-02', 'Benedito José Vieira'),
-  ('Panorama Bíblico', '2026-08-02', 'Lucas Ferreira Dutra'),
-  ('Panorama Bíblico', '2026-08-02', 'Juliana Gomes Arcanjo Silva'),
-  ('Mulheres', '2026-08-09', 'Jéssica Naiara Sousa Sombra Sanches'),
-  ('Mulheres', '2026-08-09', 'Joyce Cotrim Vieira'),
-  ('Mulheres', '2026-08-09', 'Cláudia Vieira da Silva'),
-  ('Mulheres', '2026-08-09', 'Sara Aguiar Correa'),
-  ('Mulheres', '2026-08-09', 'Gabrielle Alves Vieira'),
-  ('Mulheres', '2026-08-09', 'Vanusa Alves Santos'),
-  ('Mulheres', '2026-08-09', 'Polliane tomazo de assis'),
-  ('Mulheres', '2026-08-09', 'Aline Maria de Jesus Miranda Souza'),
-  ('Mulheres', '2026-08-09', 'Maria Odete Sousa da Silva'),
-  ('Homens', '2026-08-09', 'Fabio Henrique Nasuno de Paulo'),
-  ('Homens', '2026-08-09', 'Eberson Diniz Correa'),
-  ('Homens', '2026-08-09', 'João Lucas Souza Gondim'),
-  ('Homens', '2026-08-09', 'Filipe Poli Coutinho de Oliveira'),
-  ('Homens', '2026-08-09', 'Pablo Peterson Rodrigues de Freitas'),
-  ('Homens', '2026-08-09', 'Fábio Neri De Souza'),
-  ('Homens', '2026-08-09', 'Paulo Sérgio Sanches Magalhães'),
-  ('Panorama Bíblico', '2026-08-09', 'Natanael Pereira da Silva'),
-  ('Panorama Bíblico', '2026-08-09', 'Paulo do Santos Pinheiro'),
-  ('Panorama Bíblico', '2026-08-09', 'Wanderson Borges da Conceição'),
-  ('Mulheres', '2026-08-16', 'Jéssica Naiara Sousa Sombra Sanches'),
-  ('Mulheres', '2026-08-16', 'Marta Rodrigues Ramos'),
-  ('Mulheres', '2026-08-16', 'Marlene Lina da Silva Cunha'),
-  ('Mulheres', '2026-08-16', 'Ana karla Ferreira Dutra Moura'),
-  ('Mulheres', '2026-08-16', 'Santana Diniz Vidal'),
-  ('Mulheres', '2026-08-16', 'Cláudia Vieira da Silva'),
-  ('Mulheres', '2026-08-16', 'Sara Aguiar Correa'),
-  ('Mulheres', '2026-08-16', 'Gabrielle Alves Vieira'),
-  ('Mulheres', '2026-08-16', 'Sarah Crystina Mendes de Sousa'),
-  ('Mulheres', '2026-08-16', 'Jéssica Cotrim Cieira'),
-  ('Mulheres', '2026-08-16', 'Aline Maria de Jesus Miranda Souza'),
-  ('Mulheres', '2026-08-16', 'Gessyca Bianca Tavares Ciqueira'),
-  ('Homens', '2026-08-16', 'Éder de Souza Ramos'),
-  ('Homens', '2026-08-16', 'David Gabriel Dutra Martins'),
-  ('Homens', '2026-08-16', 'Kaio Cesar Albuquerque Cintra'),
-  ('Homens', '2026-08-16', 'Eberson Diniz Correa'),
-  ('Homens', '2026-08-16', 'João Lucas Souza Gondim'),
-  ('Homens', '2026-08-16', 'Thiago Bernardo de Freitas'),
-  ('Homens', '2026-08-16', 'Pedro Lucas Rodrigues'),
-  ('Homens', '2026-08-16', 'Rayner Augusto de Moura'),
-  ('Panorama Bíblico', '2026-08-16', 'Carlos Roberto Oliveira'),
-  ('Panorama Bíblico', '2026-08-16', 'Natanael Pereira da Silva'),
-  ('Panorama Bíblico', '2026-08-16', 'Paulo do Santos Pinheiro'),
-  ('Panorama Bíblico', '2026-08-16', 'Weniton Roberto da Costa'),
-  ('Panorama Bíblico', '2026-08-16', 'Julia Damaceno Oliveira'),
-  ('Mulheres', '2026-08-23', 'Marta Rodrigues Ramos'),
-  ('Mulheres', '2026-08-23', 'Alessia Nascimento'),
-  ('Mulheres', '2026-08-23', 'Santana Diniz Vidal'),
-  ('Mulheres', '2026-08-23', 'Sara Aguiar Correa'),
-  ('Mulheres', '2026-08-23', 'Gabrielle Alves Vieira'),
-  ('Mulheres', '2026-08-23', 'Juliana Gomes Arcanjo Silva'),
-  ('Mulheres', '2026-08-23', 'Sarah Crystina Mendes de Sousa'),
-  ('Mulheres', '2026-08-23', 'Vanusa Alves Santos'),
-  ('Mulheres', '2026-08-23', 'Gessyca Bianca Tavares Ciqueira'),
-  ('Mulheres', '2026-08-23', 'Thais Vitória'),
-  ('Homens', '2026-08-23', 'Éder de Souza Ramos'),
-  ('Homens', '2026-08-23', 'David Gabriel Dutra Martins'),
-  ('Homens', '2026-08-23', 'Fabio Henrique Nasuno de Paulo'),
-  ('Homens', '2026-08-23', 'Kaio Cesar Albuquerque Cintra'),
-  ('Homens', '2026-08-23', 'Eberson Diniz Correa'),
-  ('Homens', '2026-08-23', 'David Souza Aguiar'),
-  ('Homens', '2026-08-23', 'João Lucas Souza Gondim'),
-  ('Homens', '2026-08-23', 'Matheus Corrêa'),
-  ('Homens', '2026-08-23', 'Pedro Lucas Rodrigues'),
-  ('Homens', '2026-08-23', 'Moisés Rodrigues Siqueira'),
-  ('Homens', '2026-08-23', 'Junior Pereira'),
-  ('Panorama Bíblico', '2026-08-23', 'Carlos Roberto Oliveira'),
-  ('Panorama Bíblico', '2026-08-23', 'Maria de Lurdes Faria'),
-  ('Panorama Bíblico', '2026-08-23', 'Weniton Roberto da Costa'),
-  ('Panorama Bíblico', '2026-08-23', 'Edson santos soares'),
-  ('Panorama Bíblico', '2026-08-23', 'Isac Rodrigues Vidal'),
-  ('Panorama Bíblico', '2026-08-23', 'Lucas Ferreira Dutra'),
-  ('Panorama Bíblico', '2026-08-23', 'Talassa Patriota da Rocha'),
-  ('Mulheres', '2026-09-06', 'Daniela Regina De Resende'),
-  ('Mulheres', '2026-09-06', 'Ana Maria Ferreira Garcia Vilela'),
-  ('Mulheres', '2026-09-06', 'Marta Rodrigues Ramos'),
-  ('Mulheres', '2026-09-06', 'Alessia Nascimento'),
-  ('Mulheres', '2026-09-06', 'Alana Corrêa Oliveira'),
-  ('Mulheres', '2026-09-06', 'Sara Aguiar Correa'),
-  ('Mulheres', '2026-09-06', 'Sarah Crystina Mendes de Sousa'),
-  ('Mulheres', '2026-09-06', 'Jéssica Cotrim Cieira'),
-  ('Homens', '2026-09-06', 'Éder de Souza Ramos'),
-  ('Homens', '2026-09-06', 'Fabio Henrique Nasuno de Paulo'),
-  ('Homens', '2026-09-06', 'Eberson Diniz Correa'),
-  ('Homens', '2026-09-06', 'David Souza Aguiar'),
-  ('Homens', '2026-09-06', 'Thiago Bernardo de Freitas'),
-  ('Homens', '2026-09-06', 'Pedro Lucas Rodrigues'),
-  ('Homens', '2026-09-06', 'Moisés Rodrigues Siqueira'),
-  ('Homens', '2026-09-06', 'Breno Barros Costa'),
-  ('Homens', '2026-09-06', 'Jackson Moisés da Silva Oliveira'),
-  ('Panorama Bíblico', '2026-09-06', 'Carlos Roberto Oliveira'),
-  ('Panorama Bíblico', '2026-09-06', 'Natanael Pereira da Silva'),
-  ('Panorama Bíblico', '2026-09-06', 'Paulo do Santos Pinheiro'),
-  ('Mulheres', '2026-09-13', 'Ana Maria Ferreira Garcia Vilela'),
-  ('Mulheres', '2026-09-13', 'Marta Rodrigues Ramos'),
-  ('Mulheres', '2026-09-13', 'Alessia Nascimento'),
-  ('Mulheres', '2026-09-13', 'Alana Corrêa Oliveira'),
-  ('Mulheres', '2026-09-13', 'Sara Aguiar Correa'),
-  ('Mulheres', '2026-09-13', 'Juliana Gomes Arcanjo Silva'),
-  ('Mulheres', '2026-09-13', 'Sarah Crystina Mendes de Sousa'),
-  ('Mulheres', '2026-09-13', 'Jéssica Cotrim Cieira'),
-  ('Homens', '2026-09-13', 'Éder de Souza Ramos'),
-  ('Homens', '2026-09-13', 'Eberson Diniz Correa'),
-  ('Homens', '2026-09-13', 'Wermerson Correa'),
-  ('Homens', '2026-09-13', 'João Lucas Souza Gondim'),
-  ('Homens', '2026-09-13', 'Thiago Bernardo de Freitas'),
-  ('Homens', '2026-09-13', 'Matheus Corrêa'),
-  ('Homens', '2026-09-13', 'Pedro Lucas Rodrigues'),
-  ('Panorama Bíblico', '2026-09-13', 'Maria de Lurdes Faria'),
-  ('Panorama Bíblico', '2026-09-13', 'Paulo do Santos Pinheiro'),
-  ('Panorama Bíblico', '2026-09-13', 'Isac Rodrigues Vidal'),
-  ('Panorama Bíblico', '2026-09-13', 'Benedito José Vieira'),
-  ('Mulheres', '2026-09-20', 'Marlene Lina da Silva Cunha'),
-  ('Mulheres', '2026-09-20', 'Joyce Cotrim Vieira'),
-  ('Mulheres', '2026-09-20', 'Cláudia Vieira da Silva'),
-  ('Mulheres', '2026-09-20', 'Sara Aguiar Correa'),
-  ('Mulheres', '2026-09-20', 'Jéssica Cotrim Cieira'),
-  ('Mulheres', '2026-09-20', 'Polliane tomazo de assis'),
-  ('Mulheres', '2026-09-20', 'Aline Maria de Jesus Miranda Souza'),
-  ('Homens', '2026-09-20', 'Éder de Souza Ramos'),
-  ('Homens', '2026-09-20', 'Eberson Diniz Correa'),
-  ('Homens', '2026-09-20', 'Wermerson Correa'),
-  ('Homens', '2026-09-20', 'David Souza Aguiar'),
-  ('Homens', '2026-09-20', 'Matheus Corrêa'),
-  ('Homens', '2026-09-20', 'Pablo Peterson Rodrigues de Freitas'),
-  ('Homens', '2026-09-20', 'Fábio Neri De Souza'),
-  ('Homens', '2026-09-20', 'Moisés Rodrigues Siqueira'),
-  ('Homens', '2026-09-20', 'Breno Barros Costa'),
-  ('Homens', '2026-09-20', 'Jackson Moisés da Silva Oliveira'),
-  ('Homens', '2026-09-20', 'Isaac Pereira da Silva'),
-  ('Panorama Bíblico', '2026-09-20', 'Carlos Roberto Oliveira'),
-  ('Panorama Bíblico', '2026-09-20', 'Natanael Pereira da Silva'),
-  ('Panorama Bíblico', '2026-09-20', 'Maria de Lurdes Faria'),
-  ('Panorama Bíblico', '2026-09-20', 'Caio Silva Palhares'),
-  ('Panorama Bíblico', '2026-09-20', 'Edson santos soares'),
-  ('Panorama Bíblico', '2026-09-20', 'Isac Rodrigues Vidal'),
-  ('Panorama Bíblico', '2026-09-20', 'Benedito José Vieira'),
-  ('Panorama Bíblico', '2026-09-20', 'Wanderson Borges da Conceição'),
-  ('Panorama Bíblico', '2026-09-20', 'Julia Damaceno Oliveira');
+  insert into _carga (classe, data, nome) values
+    ('Mulheres', '2026-08-02', 'Marta Rodrigues Ramos'),
+    ('Mulheres', '2026-08-02', 'Alessia Nascimento'),
+    ('Mulheres', '2026-08-02', 'Sara Aguiar Correa'),
+    ('Mulheres', '2026-08-02', 'Gabrielle Alves Vieira'),
+    ('Mulheres', '2026-08-02', 'Vanusa Alves Santos'),
+    ('Mulheres', '2026-08-02', 'Jéssica Cotrim Cieira'),
+    ('Mulheres', '2026-08-02', 'Jéssica Alves'),
+    ('Mulheres', '2026-08-02', 'Nínive Santos'),
+    ('Homens', '2026-08-02', 'Éder de Souza Ramos'),
+    ('Homens', '2026-08-02', 'Fabio Henrique Nasuno de Paulo'),
+    ('Homens', '2026-08-02', 'Kaio Cesar Albuquerque Cintra'),
+    ('Homens', '2026-08-02', 'Eberson Diniz Correa'),
+    ('Homens', '2026-08-02', 'David Souza Aguiar'),
+    ('Homens', '2026-08-02', 'João Lucas Souza Gondim'),
+    ('Homens', '2026-08-02', 'Alessandro Felis Vieira'),
+    ('Panorama Bíblico', '2026-08-02', 'Carlos Roberto Oliveira'),
+    ('Panorama Bíblico', '2026-08-02', 'Natanael Pereira da Silva'),
+    ('Panorama Bíblico', '2026-08-02', 'Maria de Lurdes Faria'),
+    ('Panorama Bíblico', '2026-08-02', 'Paulo do Santos Pinheiro'),
+    ('Panorama Bíblico', '2026-08-02', 'Caio Silva Palhares'),
+    ('Panorama Bíblico', '2026-08-02', 'Wilton Pereira dos Santos'),
+    ('Panorama Bíblico', '2026-08-02', 'Benedito José Vieira'),
+    ('Panorama Bíblico', '2026-08-02', 'Lucas Ferreira Dutra'),
+    ('Panorama Bíblico', '2026-08-02', 'Juliana Gomes Arcanjo Silva'),
+    ('Mulheres', '2026-08-09', 'Jéssica Naiara Sousa Sombra Sanches'),
+    ('Mulheres', '2026-08-09', 'Joyce Cotrim Vieira'),
+    ('Mulheres', '2026-08-09', 'Cláudia Vieira da Silva'),
+    ('Mulheres', '2026-08-09', 'Sara Aguiar Correa'),
+    ('Mulheres', '2026-08-09', 'Gabrielle Alves Vieira'),
+    ('Mulheres', '2026-08-09', 'Vanusa Alves Santos'),
+    ('Mulheres', '2026-08-09', 'Polliane tomazo de assis'),
+    ('Mulheres', '2026-08-09', 'Aline Maria de Jesus Miranda Souza'),
+    ('Mulheres', '2026-08-09', 'Maria Odete Sousa da Silva'),
+    ('Homens', '2026-08-09', 'Fabio Henrique Nasuno de Paulo'),
+    ('Homens', '2026-08-09', 'Eberson Diniz Correa'),
+    ('Homens', '2026-08-09', 'João Lucas Souza Gondim'),
+    ('Homens', '2026-08-09', 'Filipe Poli Coutinho de Oliveira'),
+    ('Homens', '2026-08-09', 'Pablo Peterson Rodrigues de Freitas'),
+    ('Homens', '2026-08-09', 'Fábio Neri De Souza'),
+    ('Homens', '2026-08-09', 'Paulo Sérgio Sanches Magalhães'),
+    ('Panorama Bíblico', '2026-08-09', 'Natanael Pereira da Silva'),
+    ('Panorama Bíblico', '2026-08-09', 'Paulo do Santos Pinheiro'),
+    ('Panorama Bíblico', '2026-08-09', 'Wanderson Borges da Conceição'),
+    ('Mulheres', '2026-08-16', 'Jéssica Naiara Sousa Sombra Sanches'),
+    ('Mulheres', '2026-08-16', 'Marta Rodrigues Ramos'),
+    ('Mulheres', '2026-08-16', 'Marlene Lina da Silva Cunha'),
+    ('Mulheres', '2026-08-16', 'Ana karla Ferreira Dutra Moura'),
+    ('Mulheres', '2026-08-16', 'Santana Diniz Vidal'),
+    ('Mulheres', '2026-08-16', 'Cláudia Vieira da Silva'),
+    ('Mulheres', '2026-08-16', 'Sara Aguiar Correa'),
+    ('Mulheres', '2026-08-16', 'Gabrielle Alves Vieira'),
+    ('Mulheres', '2026-08-16', 'Sarah Crystina Mendes de Sousa'),
+    ('Mulheres', '2026-08-16', 'Jéssica Cotrim Cieira'),
+    ('Mulheres', '2026-08-16', 'Aline Maria de Jesus Miranda Souza'),
+    ('Mulheres', '2026-08-16', 'Gessyca Bianca Tavares Ciqueira'),
+    ('Homens', '2026-08-16', 'Éder de Souza Ramos'),
+    ('Homens', '2026-08-16', 'David Gabriel Dutra Martins'),
+    ('Homens', '2026-08-16', 'Kaio Cesar Albuquerque Cintra'),
+    ('Homens', '2026-08-16', 'Eberson Diniz Correa'),
+    ('Homens', '2026-08-16', 'João Lucas Souza Gondim'),
+    ('Homens', '2026-08-16', 'Thiago Bernardo de Freitas'),
+    ('Homens', '2026-08-16', 'Pedro Lucas Rodrigues'),
+    ('Homens', '2026-08-16', 'Rayner Augusto de Moura'),
+    ('Panorama Bíblico', '2026-08-16', 'Carlos Roberto Oliveira'),
+    ('Panorama Bíblico', '2026-08-16', 'Natanael Pereira da Silva'),
+    ('Panorama Bíblico', '2026-08-16', 'Paulo do Santos Pinheiro'),
+    ('Panorama Bíblico', '2026-08-16', 'Weniton Roberto da Costa'),
+    ('Panorama Bíblico', '2026-08-16', 'Julia Damaceno Oliveira'),
+    ('Mulheres', '2026-08-23', 'Marta Rodrigues Ramos'),
+    ('Mulheres', '2026-08-23', 'Alessia Nascimento'),
+    ('Mulheres', '2026-08-23', 'Santana Diniz Vidal'),
+    ('Mulheres', '2026-08-23', 'Sara Aguiar Correa'),
+    ('Mulheres', '2026-08-23', 'Gabrielle Alves Vieira'),
+    ('Mulheres', '2026-08-23', 'Juliana Gomes Arcanjo Silva'),
+    ('Mulheres', '2026-08-23', 'Sarah Crystina Mendes de Sousa'),
+    ('Mulheres', '2026-08-23', 'Vanusa Alves Santos'),
+    ('Mulheres', '2026-08-23', 'Gessyca Bianca Tavares Ciqueira'),
+    ('Mulheres', '2026-08-23', 'Thais Vitória'),
+    ('Homens', '2026-08-23', 'Éder de Souza Ramos'),
+    ('Homens', '2026-08-23', 'David Gabriel Dutra Martins'),
+    ('Homens', '2026-08-23', 'Fabio Henrique Nasuno de Paulo'),
+    ('Homens', '2026-08-23', 'Kaio Cesar Albuquerque Cintra'),
+    ('Homens', '2026-08-23', 'Eberson Diniz Correa'),
+    ('Homens', '2026-08-23', 'David Souza Aguiar'),
+    ('Homens', '2026-08-23', 'João Lucas Souza Gondim'),
+    ('Homens', '2026-08-23', 'Matheus Corrêa'),
+    ('Homens', '2026-08-23', 'Pedro Lucas Rodrigues'),
+    ('Homens', '2026-08-23', 'Moisés Rodrigues Siqueira'),
+    ('Homens', '2026-08-23', 'Junior Pereira'),
+    ('Panorama Bíblico', '2026-08-23', 'Carlos Roberto Oliveira'),
+    ('Panorama Bíblico', '2026-08-23', 'Maria de Lurdes Faria'),
+    ('Panorama Bíblico', '2026-08-23', 'Weniton Roberto da Costa'),
+    ('Panorama Bíblico', '2026-08-23', 'Edson santos soares'),
+    ('Panorama Bíblico', '2026-08-23', 'Isac Rodrigues Vidal'),
+    ('Panorama Bíblico', '2026-08-23', 'Lucas Ferreira Dutra'),
+    ('Panorama Bíblico', '2026-08-23', 'Talassa Patriota da Rocha'),
+    ('Mulheres', '2026-09-06', 'Daniela Regina De Resende'),
+    ('Mulheres', '2026-09-06', 'Ana Maria Ferreira Garcia Vilela'),
+    ('Mulheres', '2026-09-06', 'Marta Rodrigues Ramos'),
+    ('Mulheres', '2026-09-06', 'Alessia Nascimento'),
+    ('Mulheres', '2026-09-06', 'Alana Corrêa Oliveira'),
+    ('Mulheres', '2026-09-06', 'Sara Aguiar Correa'),
+    ('Mulheres', '2026-09-06', 'Sarah Crystina Mendes de Sousa'),
+    ('Mulheres', '2026-09-06', 'Jéssica Cotrim Cieira'),
+    ('Homens', '2026-09-06', 'Éder de Souza Ramos'),
+    ('Homens', '2026-09-06', 'Fabio Henrique Nasuno de Paulo'),
+    ('Homens', '2026-09-06', 'Eberson Diniz Correa'),
+    ('Homens', '2026-09-06', 'David Souza Aguiar'),
+    ('Homens', '2026-09-06', 'Thiago Bernardo de Freitas'),
+    ('Homens', '2026-09-06', 'Pedro Lucas Rodrigues'),
+    ('Homens', '2026-09-06', 'Moisés Rodrigues Siqueira'),
+    ('Homens', '2026-09-06', 'Breno Barros Costa'),
+    ('Homens', '2026-09-06', 'Jackson Moisés da Silva Oliveira'),
+    ('Panorama Bíblico', '2026-09-06', 'Carlos Roberto Oliveira'),
+    ('Panorama Bíblico', '2026-09-06', 'Natanael Pereira da Silva'),
+    ('Panorama Bíblico', '2026-09-06', 'Paulo do Santos Pinheiro'),
+    ('Mulheres', '2026-09-13', 'Ana Maria Ferreira Garcia Vilela'),
+    ('Mulheres', '2026-09-13', 'Marta Rodrigues Ramos'),
+    ('Mulheres', '2026-09-13', 'Alessia Nascimento'),
+    ('Mulheres', '2026-09-13', 'Alana Corrêa Oliveira'),
+    ('Mulheres', '2026-09-13', 'Sara Aguiar Correa'),
+    ('Mulheres', '2026-09-13', 'Juliana Gomes Arcanjo Silva'),
+    ('Mulheres', '2026-09-13', 'Sarah Crystina Mendes de Sousa'),
+    ('Mulheres', '2026-09-13', 'Jéssica Cotrim Cieira'),
+    ('Homens', '2026-09-13', 'Éder de Souza Ramos'),
+    ('Homens', '2026-09-13', 'Eberson Diniz Correa'),
+    ('Homens', '2026-09-13', 'Wemerson Correa'),
+    ('Homens', '2026-09-13', 'João Lucas Souza Gondim'),
+    ('Homens', '2026-09-13', 'Thiago Bernardo de Freitas'),
+    ('Homens', '2026-09-13', 'Matheus Corrêa'),
+    ('Homens', '2026-09-13', 'Pedro Lucas Rodrigues'),
+    ('Panorama Bíblico', '2026-09-13', 'Maria de Lurdes Faria'),
+    ('Panorama Bíblico', '2026-09-13', 'Paulo do Santos Pinheiro'),
+    ('Panorama Bíblico', '2026-09-13', 'Isac Rodrigues Vidal'),
+    ('Panorama Bíblico', '2026-09-13', 'Benedito José Vieira'),
+    ('Mulheres', '2026-09-20', 'Marlene Lina da Silva Cunha'),
+    ('Mulheres', '2026-09-20', 'Joyce Cotrim Vieira'),
+    ('Mulheres', '2026-09-20', 'Cláudia Vieira da Silva'),
+    ('Mulheres', '2026-09-20', 'Sara Aguiar Correa'),
+    ('Mulheres', '2026-09-20', 'Jéssica Cotrim Cieira'),
+    ('Mulheres', '2026-09-20', 'Polliane tomazo de assis'),
+    ('Mulheres', '2026-09-20', 'Aline Maria de Jesus Miranda Souza'),
+    ('Homens', '2026-09-20', 'Éder de Souza Ramos'),
+    ('Homens', '2026-09-20', 'Eberson Diniz Correa'),
+    ('Homens', '2026-09-20', 'Wemerson Correa'),
+    ('Homens', '2026-09-20', 'David Souza Aguiar'),
+    ('Homens', '2026-09-20', 'Matheus Corrêa'),
+    ('Homens', '2026-09-20', 'Pablo Peterson Rodrigues de Freitas'),
+    ('Homens', '2026-09-20', 'Fábio Neri De Souza'),
+    ('Homens', '2026-09-20', 'Moisés Rodrigues Siqueira'),
+    ('Homens', '2026-09-20', 'Breno Barros Costa'),
+    ('Homens', '2026-09-20', 'Jackson Moisés da Silva Oliveira'),
+    ('Homens', '2026-09-20', 'Isaac Pereira da Silva'),
+    ('Panorama Bíblico', '2026-09-20', 'Carlos Roberto Oliveira'),
+    ('Panorama Bíblico', '2026-09-20', 'Natanael Pereira da Silva'),
+    ('Panorama Bíblico', '2026-09-20', 'Maria de Lurdes Faria'),
+    ('Panorama Bíblico', '2026-09-20', 'Caio Silva Palhares'),
+    ('Panorama Bíblico', '2026-09-20', 'Edson santos soares'),
+    ('Panorama Bíblico', '2026-09-20', 'Isac Rodrigues Vidal'),
+    ('Panorama Bíblico', '2026-09-20', 'Benedito José Vieira'),
+    ('Panorama Bíblico', '2026-09-20', 'Wanderson Borges da Conceição'),
+    ('Panorama Bíblico', '2026-09-20', 'Julia Damaceno Oliveira');
 
--- 5) Conferência: todo nome precisa achar exatamente UMA pessoa
-do $$
-declare
-  sem_pessoa text;
-  duplicados text;
-begin
+  -- 5) Conferência: todo nome precisa achar exatamente UMA pessoa
   select string_agg(distinct c.nome, ', ') into sem_pessoa
   from _carga c
   where not exists (select 1 from pessoas p where lower(p.nome) = lower(c.nome));
@@ -560,52 +560,53 @@ begin
   if duplicados is not null then
     raise exception 'Nomes que existem mais de uma vez em pessoas (resolva antes): %', duplicados;
   end if;
-end $$;
 
--- 6) Abrir as datas (aulas) que ainda não existem, no módulo 1 da turma
-insert into aulas (modulo_id, data)
-select
-  (select m.id
-     from modulos m
-     join turmas t on t.id = m.turma_id
-     join semestres s on s.id = t.semestre_id
-    where s.ano = 2026 and s.periodo = 2 and t.nome = c.classe
-    order by m.numero
-    limit 1),
-  c.data
-from (select distinct classe, data from _carga) c
-where not exists (
-  select 1
-    from aulas a
-    join modulos m on m.id = a.modulo_id
-    join turmas t on t.id = m.turma_id
-    join semestres s on s.id = t.semestre_id
-   where s.ano = 2026 and s.periodo = 2 and t.nome = c.classe and a.data = c.data
-);
+  -- 6) Abrir as datas (aulas) que ainda não existem, no módulo 1 da turma
+  insert into aulas (modulo_id, data)
+  select
+    (select m.id
+       from modulos m
+       join turmas t on t.id = m.turma_id
+       join semestres s on s.id = t.semestre_id
+      where s.ano = 2026 and s.periodo = 2 and t.nome = c.classe
+      order by m.numero
+      limit 1),
+    c.data
+  from (select distinct classe, data from _carga) c
+  where not exists (
+    select 1
+      from aulas a
+      join modulos m on m.id = a.modulo_id
+      join turmas t on t.id = m.turma_id
+      join semestres s on s.id = t.semestre_id
+     where s.ano = 2026 and s.periodo = 2 and t.nome = c.classe and a.data = c.data
+  );
 
--- 7) Matricular na turma quem apareceu nela
-insert into matriculas (turma_id, pessoa_id, ativo)
-select distinct t.id, p.id, true
-from _carga c
-join semestres s on s.ano = 2026 and s.periodo = 2
-join turmas t on t.semestre_id = s.id and t.nome = c.classe
-join pessoas p on lower(p.nome) = lower(c.nome)
-on conflict (turma_id, pessoa_id) do nothing;
+  -- 7) Matricular na turma quem apareceu nela
+  insert into matriculas (turma_id, pessoa_id, ativo)
+  select distinct t.id, p.id, true
+  from _carga c
+  join semestres s on s.ano = 2026 and s.periodo = 2
+  join turmas t on t.semestre_id = s.id and t.nome = c.classe
+  join pessoas p on lower(p.nome) = lower(c.nome)
+  on conflict (turma_id, pessoa_id) do nothing;
 
--- 8) Presenças
-insert into presencas (aula_id, pessoa_id, status)
-select distinct a.id, p.id, 'presente'::presenca_status
-from _carga c
-join semestres s on s.ano = 2026 and s.periodo = 2
-join turmas t on t.semestre_id = s.id and t.nome = c.classe
-join modulos m on m.turma_id = t.id
-join aulas a on a.modulo_id = m.id and a.data = c.data
-join pessoas p on lower(p.nome) = lower(c.nome)
-on conflict (aula_id, pessoa_id) do nothing;
+  -- 8) Presenças
+  insert into presencas (aula_id, pessoa_id, status)
+  select distinct a.id, p.id, 'presente'::presenca_status
+  from _carga c
+  join semestres s on s.ano = 2026 and s.periodo = 2
+  join turmas t on t.semestre_id = s.id and t.nome = c.classe
+  join modulos m on m.turma_id = t.id
+  join aulas a on a.modulo_id = m.id and a.data = c.data
+  join pessoas p on lower(p.nome) = lower(c.nome)
+  on conflict (aula_id, pessoa_id) do nothing;
 
-commit;
+  drop table _carga;
+end
+$carga$;
 
--- 9) Conferência final: presentes por turma e data. Devem bater com a tabela abaixo.
+-- 9) Conferência final: presentes por turma e data. Devem bater com a lista abaixo.
 select t.nome as turma, a.data, count(*) filter (where pr.status = 'presente') as presentes
 from presencas pr
 join aulas a on a.id = pr.aula_id
