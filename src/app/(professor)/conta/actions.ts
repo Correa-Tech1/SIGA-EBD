@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface EstadoConta {
   erro?: string;
@@ -28,6 +29,8 @@ export async function alterarMinhaSenha(
 
   const { error } = await supabase.auth.updateUser({ password: nova });
   if (error) return { erro: `Não foi possível trocar a senha: ${error.message}` };
+  // a senha guardada (visível para a coordenação) deixou de valer
+  await createAdminClient().from("pessoas").update({ senha_cifrada: null }).eq("auth_user_id", user.id);
   return { sucesso: "Senha alterada." };
 }
 

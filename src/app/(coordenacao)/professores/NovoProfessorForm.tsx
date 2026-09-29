@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { criarProfessor, type EstadoCriarProfessor } from "./actions";
 
@@ -20,9 +21,15 @@ function BotaoCriar() {
 
 export function NovoProfessorForm({ turmas }: { turmas: { id: string; nome: string }[] }) {
   const [estado, acao] = useFormState(criarProfessor, estadoInicial);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // criou: limpa o formulário para já cadastrar o próximo
+  useEffect(() => {
+    if (estado.sucesso) formRef.current?.reset();
+  }, [estado]);
 
   return (
-    <form action={acao} className="rounded-xl border border-border bg-surface p-6">
+    <form ref={formRef} action={acao} className="rounded-xl border border-border bg-surface p-6">
       <div className="font-display text-base font-semibold text-primary">
         Nova conta de professor
       </div>
@@ -98,17 +105,10 @@ export function NovoProfessorForm({ turmas }: { turmas: { id: string; nome: stri
         </p>
       )}
 
-      {estado.sucesso && estado.senhaGerada && (
-        <div className="mt-3 rounded-lg bg-accent/10 p-3 text-sm">
-          <strong>{estado.sucesso}</strong>
-          <div className="mt-1">
-            Senha: <code className="rounded bg-white px-2 py-0.5">{estado.senhaGerada}</code>
-          </div>
-          <div className="mt-1 text-xs text-text-secondary">
-            Passe essa senha pro professor por fora do sistema (WhatsApp, presencial) —
-            ela não aparece de novo depois que você sair desta tela.
-          </div>
-        </div>
+      {estado.sucesso && (
+        <p className="mt-3 text-sm text-success" role="status">
+          {estado.sucesso} A senha fica visível na lista abaixo.
+        </p>
       )}
     </form>
   );

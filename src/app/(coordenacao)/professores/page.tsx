@@ -5,6 +5,8 @@ import { corDaTurma } from "@/lib/relatorio/cores";
 import { NovoProfessorForm } from "./NovoProfessorForm";
 import { ResetarSenhaBotao } from "./ResetarSenhaBotao";
 import { TurmasProfessorForm } from "./TurmasProfessorForm";
+import { SenhaVisivel } from "./SenhaVisivel";
+import { decifrarSenha } from "@/lib/auth/senha-visivel";
 import { TipoProfessorForm } from "./TipoProfessorForm";
 
 // Server Component: lê com o cliente de SESSÃO (não o admin) — a policy
@@ -18,7 +20,7 @@ export default async function ProfessoresPage() {
   const [{ data: professores }, turmas, { data: vinculos }] = await Promise.all([
     supabase
       .from("pessoas")
-      .select("id, nome, auth_user_id, criado_em, professor_tipo")
+      .select("id, nome, auth_user_id, criado_em, professor_tipo, senha_cifrada")
       .eq("role", "professor")
       .order("nome"),
     listarTurmas(),
@@ -81,8 +83,8 @@ export default async function ProfessoresPage() {
                     </span>
                   </div>
                   <div className="text-xs text-text-secondary">
-                    usuário: <code>{usuarios.get(p.id) || "—"}</code> · criada em{" "}
-                    {new Date(p.criado_em).toLocaleDateString("pt-BR")}
+                    usuário: <code>{usuarios.get(p.id) || "—"}</code> · <SenhaVisivel senha={decifrarSenha(p.senha_cifrada)} /> ·
+                    criada em {new Date(p.criado_em).toLocaleDateString("pt-BR")}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

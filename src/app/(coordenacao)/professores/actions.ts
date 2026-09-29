@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { exigirCoordenacao } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { hojeIso } from "@/lib/relatorio/dados";
+import { cifrarSenha } from "@/lib/auth/senha-visivel";
 
 export interface EstadoCriarProfessor {
   erro?: string;
@@ -83,6 +83,7 @@ export async function criarProfessor(
       tipo: "membro",
       role: "professor",
       professor_tipo: professorTipo,
+      senha_cifrada: cifrarSenha(senha),
     })
     .select("id")
     .single();
@@ -145,6 +146,8 @@ export async function resetarSenha(
   if (error) {
     return { erro: `Falha ao resetar senha: ${error.message}` };
   }
+  await admin.from("pessoas").update({ senha_cifrada: cifrarSenha(senha) }).eq("auth_user_id", authUserId);
+  revalidatePath("/professores");
 
   return { senhaGerada: senha };
 }

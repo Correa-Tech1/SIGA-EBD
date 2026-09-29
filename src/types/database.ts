@@ -32,6 +32,7 @@ export interface Database {
           data_nascimento: string | null;
           genero: "M" | "F" | null;
           professor_tipo: "regular" | "convidado" | null;
+          senha_cifrada: string | null;
           criado_em: string;
         },
         "nome"
