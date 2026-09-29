@@ -8,6 +8,7 @@
 // recarregar a página nunca perde o histórico.
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ArquivosGerados } from "./ArquivosGerados";
 
 interface Anexo {
   nome: string;
@@ -18,6 +19,7 @@ interface Mensagem {
   role: "user" | "assistant";
   texto: string;
   anexos?: Anexo[];
+  arquivos?: Anexo[];
 }
 
 const TIPOS = ["pdf", "docx", "pptx", "png", "jpg", "jpeg"];
@@ -26,8 +28,10 @@ const MAX_MB = 20;
 export function ChatAuxilio({
   rascunhoId,
   pessoaId,
+  turmas,
   historicoInicial,
 }: {
+  turmas: { id: string; nome: string }[];
   rascunhoId: string;
   pessoaId: string;
   historicoInicial: Mensagem[];
@@ -95,7 +99,7 @@ export function ChatAuxilio({
         return;
       }
 
-      setMensagens((atual) => [...atual, { role: "assistant", texto: dados.resposta as string }]);
+      setMensagens((atual) => [...atual, { role: "assistant", texto: dados.resposta as string, arquivos: (dados.arquivos as Anexo[]) ?? [] }]);
     } catch {
       setErro("Falha de conexão. Tente de novo.");
       setMensagens((atual) => atual.slice(0, -1));
@@ -137,6 +141,7 @@ export function ChatAuxilio({
               </div>
             )}
             {m.texto}
+            {m.arquivos && m.arquivos.length > 0 && <ArquivosGerados arquivos={m.arquivos} turmas={turmas} />}
           </div>
         ))}
         {enviando && <div className="text-xs text-text-secondary">Pensando…</div>}

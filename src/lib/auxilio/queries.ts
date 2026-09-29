@@ -12,6 +12,8 @@ export interface Mensagem {
   role: "user" | "assistant";
   texto: string;
   anexos?: AnexoMensagem[];
+  // arquivos gerados pela IA nesta resposta (bucket privado 'auxilio')
+  arquivos?: AnexoMensagem[];
 }
 
 export interface RascunhoResumo {

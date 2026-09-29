@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { exigirProfessorOuCoordenacao } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { registrarMaterial } from "@/lib/biblioteca/actions";
 
 export interface EstadoForm {
   erro?: string;
@@ -79,4 +80,47 @@ export async function apagarRascunho(
 
   revalidatePath("/auxilio");
   return { sucesso: "Rascunho apagado." };
+}
+
+// Publica na Biblioteca (Aulas → Slides) um arquivo que o Auxílio gerou.
+// Copia do bucket privado 'auxilio' para o público 'materiais' e registra.
+export async function publicarGeradoNaBiblioteca(entrada: {
+  caminho: string;
+  nome: string;
+  turmaId: string;
+}): Promise<{ erro?: string; sucesso?: string }> {
+  let sessao;
+  try {
+    sessao = await exigirProfessorOuCoordenacao();
+  } catch {
+    return { erro: "Ação restrita a professores e coordenação." };
+  }
+  if (!sessao.pessoaId || !entrada.caminho.startsWith(`${sessao.pessoaId}/`) || entrada.caminho.includes("..")) {
+    return { erro: "Arquivo inválido." };
+  }
+  if (!entrada.turmaId) return { erro: "Escolha a turma." };
+
+  const supabase = createClient();
+  const { data: blob, error: erroBaixar } = await supabase.storage.from("auxilio").download(entrada.caminho);
+  if (erroBaixar || !blob) return { erro: `Não encontrei o arquivo: ${erroBaixar?.message ?? "sem retorno"}` };
+
+  const nomeSeguro = entrada.nome
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^\w.\-]+/g, "_");
+  const destino = `aulas/${sessao.pessoaId}/${Date.now()}-${nomeSeguro}`;
+  const { error: erroEnviar } = await supabase.storage.from("materiais").upload(destino, blob, {
+    contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  });
+  if (erroEnviar) return { erro: `Falha ao publicar: ${erroEnviar.message}` };
+
+  const r = await registrarMaterial({
+    categoria: "aula",
+    titulo: entrada.nome.replace(/\.pptx$/i, ""),
+    tipo: "pptx",
+    caminho: destino,
+    turmaId: entrada.turmaId,
+    papel: "slides",
+  });
+  return r.erro ? { erro: r.erro } : { sucesso: "Publicado na Biblioteca, em Aulas → Slides." };
 }

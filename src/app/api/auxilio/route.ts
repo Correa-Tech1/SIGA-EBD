@@ -16,10 +16,10 @@ import { METODO_SISTEMA } from "@/lib/auxilio/metodologia";
 import { montarContextoConteudo } from "@/lib/auxilio/contexto";
 import type { Mensagem, AnexoMensagem } from "@/lib/auxilio/queries";
 import { blocosDoArquivo, type BlocoArquivo } from "@/lib/auxilio/arquivos";
-import { FERRAMENTAS, executarFerramenta } from "@/lib/auxilio/ferramentas";
+import { FERRAMENTAS, executarFerramenta, type ArquivoGerado } from "@/lib/auxilio/ferramentas";
 
 const MODELO_FIXO = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
-const MAX_TOKENS_FIXO = 4000;
+const MAX_TOKENS_FIXO = 6000;
 const MAX_RODADAS_FERRAMENTA = 6;
 const MAX_ANEXOS_NA_CONVERSA = 5;
 
@@ -135,12 +135,20 @@ export async function POST(request: NextRequest) {
 CAPACIDADES NESTA CONVERSA:
 - O professor pode anexar PDF, DOCX, PPTX e imagens; você os recebe no corpo da mensagem.
 - Você tem acesso à Biblioteca da EBD (livros, materiais institucionais e aulas de outros professores) pelas ferramentas listar_biblioteca e ler_material. Consulte-a quando ajudar (ex.: o livro-base do módulo) e cite o título do material que usou. Não invente o que não leu.
-- Nesta fase você ainda NÃO gera arquivos para download: entregue o roteiro/aula pronto em texto organizado (títulos, passos, perguntas), que o professor copia para o material dele.
+- Você GERA slides em PowerPoint editável com a ferramenta gerar_slides. Regras:
+  1. Antes de gerar, alinhe com o professor o conteúdo (tese, pergunta de abertura, textos bíblicos). Se ele já deu o conteúdo, gere direto e depois pergunte o que ajustar.
+  2. Use o estilo visual da EBD: um pensamento por slide, frases curtas, alternância de tema escuro/claro, cards para comparações, um slide 'imagem' onde o professor colará foto/vídeo, e fechamento com a pergunta que fica.
+  3. O PRIMEIRO slide é sempre a 'capa' com o TÍTULO da aula (kicker: 'LIÇÃO N · TÍTULO CURTO'; rodapé: turma · módulo · tema).
+  4. Texto bíblico: nunca invente. Use exatamente o texto que o professor mandou ou que está na Biblioteca; se não tiver, deixe um slide de versículo com a referência e avise que ele precisa colar o texto.
+  5. Notas do orador (campo 'nota') são bem-vindas: o que dizer e a pergunta que 'cerca'.
+- Depois de gerar, responda em texto curto: o que montou, a ordem dos slides e o que o professor precisa completar.
 
 ---
 CONTEÚDO DO SEMESTRE (esta aula/rascunho específico):
 ${contexto}`;
 
+  const sessaoAtual = await exigirProfessorOuCoordenacao();
+  const ctxFerramentas = { pessoaId: sessaoAtual.pessoaId ?? "", gerados: [] as ArquivoGerado[] };
   let resposta: Anthropic.Message;
   try {
     let rodada = 0;
@@ -158,7 +166,7 @@ ${contexto}`;
       const resultados: Anthropic.ToolResultBlockParam[] = [];
       for (const bloco of resposta.content) {
         if (bloco.type !== "tool_use") continue;
-        const saida = await executarFerramenta(bloco.name, (bloco.input ?? {}) as Record<string, unknown>);
+        const saida = await executarFerramenta(bloco.name, (bloco.input ?? {}) as Record<string, unknown>, ctxFerramentas);
         resultados.push({ type: "tool_result", tool_use_id: bloco.id, content: saida });
       }
       mensagensApi.push({ role: "user", content: resultados });
@@ -177,7 +185,7 @@ ${contexto}`;
   const novoHistorico: Mensagem[] = [
     ...historicoAnterior,
     { role: "user", texto: mensagem, ...(anexosNovos.length ? { anexos: anexosNovos } : {}) },
-    { role: "assistant", texto: textoResposta },
+    { role: "assistant", texto: textoResposta, ...(ctxFerramentas.gerados.length ? { arquivos: ctxFerramentas.gerados } : {}) },
   ];
 
   // Título automático só na primeira troca (rascunho recém-criado, ainda
@@ -193,5 +201,5 @@ ${contexto}`;
     .update({ conteudo: { historico: novoHistorico }, titulo: tituloNovo })
     .eq("id", rascunhoId);
 
-  return NextResponse.json({ resposta: textoResposta });
+  return NextResponse.json({ resposta: textoResposta, arquivos: ctxFerramentas.gerados });
 }

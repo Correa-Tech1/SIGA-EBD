@@ -2,6 +2,8 @@ import { listarRascunhos, buscarRascunho, listarAulasParaEscolher } from "@/lib/
 import { getSessaoAtual } from "@/lib/auth/session";
 import { NovoRascunhoForm, BotaoApagarRascunho } from "@/components/auxilio/ClientForms";
 import { ChatAuxilio } from "@/components/auxilio/ChatAuxilio";
+import { listarTurmas } from "@/lib/estrutura/queries";
+import { listarMinhasTurmasIds } from "@/lib/frequencia/queries";
 
 // Fase 6, construída por último de propósito (ver "Passo a passo" na
 // Proposta de Arquitetura). O chat de verdade roda contra
@@ -20,6 +22,12 @@ export default async function AuxilioProfessorPage({
     listarRascunhos(),
     listarAulasParaEscolher(sessao.role === "coordenacao"),
   ]);
+
+  const todasTurmas = await listarTurmas();
+  const minhas = sessao.role === "coordenacao" ? null : await listarMinhasTurmasIds();
+  const turmasPublicar = todasTurmas
+    .filter((t) => minhas === null || minhas.includes(t.id))
+    .map((t) => ({ id: t.id, nome: t.nome }));
 
   const rascunhoAtualId = searchParams.rascunho ?? rascunhos[0]?.id;
   const rascunhoAtual = rascunhoAtualId ? await buscarRascunho(rascunhoAtualId) : null;
@@ -64,6 +72,7 @@ export default async function AuxilioProfessorPage({
             key={rascunhoAtual.id}
             rascunhoId={rascunhoAtual.id}
             pessoaId={sessao.pessoaId ?? ""}
+            turmas={turmasPublicar}
             historicoInicial={rascunhoAtual.conteudo?.historico ?? []}
           />
         ) : (
