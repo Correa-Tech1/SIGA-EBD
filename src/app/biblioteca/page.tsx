@@ -1,7 +1,7 @@
 import { listarTurmas } from "@/lib/estrutura/queries";
 import { listarPrateleira, nomesDePessoas } from "@/lib/biblioteca/queries";
 import { ListaMateriais } from "@/components/biblioteca/ListaMateriais";
-import { UploadBiblioteca } from "@/components/biblioteca/UploadBiblioteca";
+import { UploadBiblioteca, type Prateleira } from "@/components/biblioteca/UploadBiblioteca";
 import { getSessaoAtual } from "@/lib/auth/session";
 import { listarMinhasTurmasIds } from "@/lib/frequencia/queries";
 import { corDaTurma } from "@/lib/relatorio/cores";
@@ -36,6 +36,8 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
     ]
       .filter(Boolean)
       .join(" · ");
+  const prateleirasPermitidas: Prateleira[] = ehCoord ? ["livro", "institucional", "apoio_professor", "aula"] : ["aula"];
+  const configMover = { prateleiras: prateleirasPermitidas, turmas: turmasSimples };
   const podeApagarAula = (m: (typeof aulas)[number]) => ehCoord || (ehProf && m.enviado_por === sessao.pessoaId);
   const gruposAula = [
     ...turmas.filter((t) => !turmaFiltro || t.id === turmaFiltro.id).map((t) => ({ id: t.id as string | null, nome: t.nome })),
@@ -67,6 +69,23 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
         </nav>
       </div>
 
+      {(ehCoord || ehProf) && (
+        <section className="rounded-xl border border-primary/30 bg-surface p-5">
+          <h2 className="font-display text-lg font-semibold text-primary">Adicionar à Biblioteca</h2>
+          <p className="mb-3 text-xs text-text-secondary">
+            {ehCoord
+              ? "Escolha a prateleira e envie. Depois dá para renomear e mover cada arquivo entre prateleiras."
+              : "Você publica na prateleira Aulas, na turma em que dá aula. Depois dá para renomear e ajustar cada arquivo seu."}
+          </p>
+          <UploadBiblioteca
+            prateleiras={prateleirasPermitidas}
+            pessoaId={sessao.pessoaId}
+            turmas={turmasSimples}
+            turmaPadrao={turmaFiltro?.id}
+          />
+        </section>
+      )}
+
       {prateleiras.map((p) => (
         <section key={p.id} id={p.id} className="scroll-mt-6 rounded-xl border border-border bg-surface p-5">
           <h2 className="font-display text-lg font-semibold text-primary">{p.titulo}</h2>
@@ -74,9 +93,9 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
           <ListaMateriais
             materiais={p.itens}
             podeApagar={ehCoord}
+            mover={configMover}
             detalhe={(m) => new Date(m.criado_em).toLocaleDateString("pt-BR")}
           />
-          {ehCoord && <UploadBiblioteca categoria={p.id === "livros" ? "livro" : p.id === "apoio" ? "apoio_professor" : "institucional"} pessoaId={sessao.pessoaId} />}
         </section>
       ))}
 
@@ -112,19 +131,16 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <div className="mb-1 text-xs font-medium text-text-secondary">SLIDES DA AULA</div>
-                  <ListaMateriais materiais={g.itens.filter((m) => m.papel === "slides")} podeApagar={podeApagarAula} detalhe={detalheAula} />
+                  <ListaMateriais materiais={g.itens.filter((m) => m.papel === "slides")} podeApagar={podeApagarAula} mover={configMover} detalhe={detalheAula} />
                 </div>
                 <div>
                   <div className="mb-1 text-xs font-medium text-text-secondary">MATERIAIS DE APOIO</div>
-                  <ListaMateriais materiais={g.itens.filter((m) => m.papel !== "slides")} podeApagar={podeApagarAula} detalhe={detalheAula} />
+                  <ListaMateriais materiais={g.itens.filter((m) => m.papel !== "slides")} podeApagar={podeApagarAula} mover={configMover} detalhe={detalheAula} />
                 </div>
               </div>
             </div>
           ))}
         </div>
-        {(ehCoord || ehProf) && (
-          <UploadBiblioteca categoria="aula" pessoaId={sessao.pessoaId} turmas={turmasSimples} turmaPadrao={turmaFiltro?.id} />
-        )}
       </section>
     </div>
   );

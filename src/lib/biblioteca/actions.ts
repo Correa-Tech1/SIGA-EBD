@@ -330,3 +330,70 @@ export async function renomearMaterial(
   revalidatePath("/aba-aluno");
   return { sucesso: "Nome atualizado." };
 }
+
+// Realoca um material em outra prateleira (e, nas Aulas, outra turma/papel).
+// Coordenação move qualquer um para qualquer prateleira; professor só ajusta
+// turma/papel das próprias aulas (não tira de Aulas nem mexe em material alheio).
+export async function moverMaterial(
+  materialId: string,
+  destino: { categoria: string; turmaId?: string | null; papel?: string | null }
+): Promise<EstadoForm> {
+  let sessao;
+  try {
+    sessao = await exigirProfessorOuCoordenacao();
+  } catch {
+    return { erro: "Ação restrita a professores e coordenação." };
+  }
+  if (!["livro", "institucional", "aula", "apoio_professor"].includes(destino.categoria)) {
+    return { erro: "Prateleira inválida." };
+  }
+  const categoria = destino.categoria as "livro" | "institucional" | "aula" | "apoio_professor";
+
+  const supabase = createClient();
+  const { data: material } = await supabase
+    .from("materiais")
+    .select("id, enviado_por, categoria, tipo_arquivo")
+    .eq("id", materialId)
+    .maybeSingle();
+  if (!material) return { erro: "Material não encontrado." };
+
+  const ehCoord = sessao.role === "coordenacao";
+  if (!ehCoord) {
+    if (material.enviado_por !== sessao.pessoaId) return { erro: "Você só pode mover materiais que você mesmo enviou." };
+    if (categoria !== "aula" || material.categoria !== "aula") return { erro: "Professor organiza apenas as próprias aulas." };
+  }
+
+  let turmaId: string | null = null;
+  let papel: "slides" | "apoio" | null = null;
+  if (categoria === "aula") {
+    if (!destino.turmaId) return { erro: "Escolha a turma da aula (ou Unificada)." };
+    if (destino.papel !== "slides" && destino.papel !== "apoio") return { erro: "Diga se é slide da aula ou material de apoio." };
+    papel = destino.papel;
+    if (destino.turmaId !== "unificada") {
+      turmaId = destino.turmaId;
+      if (!ehCoord) {
+        const { data: minhas } = await supabase.rpc("minhas_turmas");
+        if (!((minhas ?? []) as unknown as string[]).includes(turmaId)) {
+          return { erro: "Você só publica aulas nas turmas em que está escalado." };
+        }
+      }
+    }
+  }
+
+  const { error } = await supabase
+    .from("materiais")
+    .update({
+      categoria,
+      origem: categoria === "aula" ? "de_aula" : "oficial",
+      turma_id: turmaId,
+      papel,
+    })
+    .eq("id", materialId);
+  if (error) return { erro: `Falha ao mover: ${error.message}` };
+
+  revalidatePath("/biblioteca");
+  revalidatePath("/minha-turma");
+  revalidatePath("/frequencia");
+  revalidatePath("/aba-aluno");
+  return { sucesso: "Material realocado." };
+}

@@ -1,6 +1,6 @@
 import { urlPublicaMaterial, type Material } from "@/lib/biblioteca/queries";
 import { BotaoApagarMaterial } from "./ClientForms";
-import { TituloMaterial } from "./TituloMaterial";
+import { TituloMaterial, type ConfigMover } from "./TituloMaterial";
 
 const ICONE_POR_TIPO: Record<string, string> = {
   pdf: "📄",
@@ -23,7 +23,10 @@ export function ListaMateriais({
   materiais,
   podeApagar,
   detalhe,
+  mover,
 }: {
+  // habilita “mover” de prateleira (só a Biblioteca passa isto)
+  mover?: ConfigMover;
   materiais: Material[];
   // Booleano simples (tudo ou nada) ou uma função pra decidir por material —
   // usada quando professor só pode apagar o que ele mesmo enviou, mas
@@ -55,6 +58,8 @@ export function ListaMateriais({
               icone={ICONE_POR_TIPO[material.tipo_arquivo] ?? "📎"}
               detalhe={detalhe?.(material)}
               editavel={apagavel}
+              mover={mover}
+              atual={{ categoria: material.categoria, turmaId: material.turma_id, papel: material.papel }}
             />
             {apagavel && <BotaoApagarMaterial materialId={material.id} />}
           </div>
