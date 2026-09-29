@@ -2,6 +2,8 @@ import { listarTurmas, listarModulos } from "@/lib/estrutura/queries";
 import { listarMateriaisOficiais } from "@/lib/biblioteca/queries";
 import { ListaMateriais } from "@/components/biblioteca/ListaMateriais";
 import { UploadMaterialOficialForm } from "@/components/biblioteca/ClientForms";
+import { getSessaoAtual } from "@/lib/auth/session";
+import { listarMinhasTurmasIds } from "@/lib/frequencia/queries";
 
 // Espaço da Coordenação: publica o material OFICIAL de cada módulo (ligado
 // ao módulo, não à aula — por isso vive aqui e não em Frequência/Minha
@@ -9,12 +11,20 @@ import { UploadMaterialOficialForm } from "@/components/biblioteca/ClientForms";
 // específica). Os dois têm origem diferente na tabela `materiais` (0001) e
 // bucket/pasta diferentes no Storage (0005), mas a mesma leitura pública —
 // tudo aparece junto pro aluno na Aba do Aluno.
+// A página serve aos dois papéis: coordenação publica e apaga; professor só
+// consulta e baixa (o material da própria aula ele envia em Minha Turma).
 export default async function BibliotecaPage({
   searchParams,
 }: {
   searchParams: { turma?: string };
 }) {
-  const turmas = await listarTurmas();
+  const [todasTurmas, sessao] = await Promise.all([listarTurmas(), getSessaoAtual()]);
+  const podeEditar = sessao.role === "coordenacao";
+  // professor: as turmas dele vêm primeiro
+  const minhas = podeEditar ? [] : await listarMinhasTurmasIds();
+  const turmas = [...todasTurmas].sort(
+    (a, b) => Number(minhas.includes(b.id)) - Number(minhas.includes(a.id))
+  );
 
   if (turmas.length === 0) {
     return (
@@ -23,8 +33,7 @@ export default async function BibliotecaPage({
           Biblioteca de Materiais
         </h1>
         <p className="mt-4 max-w-xl text-sm text-text-secondary">
-          Nenhuma turma cadastrada ainda — crie a estrutura do semestre na tela de Frequência
-          primeiro.
+          Nenhuma turma cadastrada ainda.
         </p>
       </div>
     );
@@ -41,7 +50,7 @@ export default async function BibliotecaPage({
           Biblioteca de Materiais
         </h1>
         <p className="mt-1 text-sm text-text-secondary">
-          Espaço da Coordenação — material oficial de cada módulo, público pra todo mundo.
+          {podeEditar ? "Espaço da Coordenação — material oficial de cada módulo, público pra todo mundo." : "Material oficial de cada módulo, para consulta e download."}
         </p>
       </div>
 
@@ -79,9 +88,9 @@ export default async function BibliotecaPage({
             <div className="text-xs text-text-secondary">Livro base: {modulo.livro_base}</div>
           )}
           <div className="mt-3">
-            <ListaMateriais materiais={materiaisPorModulo[i]} podeApagar />
+            <ListaMateriais materiais={materiaisPorModulo[i]} podeApagar={podeEditar} />
           </div>
-          <UploadMaterialOficialForm moduloId={modulo.id} />
+          {podeEditar && <UploadMaterialOficialForm moduloId={modulo.id} />}
         </div>
       ))}
     </div>

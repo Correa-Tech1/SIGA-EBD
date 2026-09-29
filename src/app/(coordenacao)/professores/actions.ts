@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { exigirCoordenacao } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import { hojeIso } from "@/lib/relatorio/dados";
 
 export interface EstadoCriarProfessor {
   erro?: string;
@@ -49,7 +51,12 @@ export async function criarProfessor(
     return { erro: "Usuário deve conter só letras, números, ponto, hífen ou underline." };
   }
 
-  const senha = gerarSenhaProvisoria();
+  const senhaInformada = String(formData.get("senha") ?? "").trim();
+  if (senhaInformada && senhaInformada.length < 6) {
+    return { erro: "A senha precisa ter pelo menos 6 caracteres." };
+  }
+  const senha = senhaInformada || gerarSenhaProvisoria();
+  const turmaIds = formData.getAll("turmaId").map(String).filter(Boolean);
   const admin = createAdminClient();
 
   const { data: userData, error: userError } = await admin.auth.admin.createUser({
@@ -67,20 +74,43 @@ export async function criarProfessor(
     };
   }
 
-  const { error: pessoaError } = await admin.from("pessoas").insert({
-    auth_user_id: userData.user.id,
-    nome,
-    tipo: "membro",
-    role: "professor",
-  });
+  const { data: pessoaCriada, error: pessoaError } = await admin
+    .from("pessoas")
+    .insert({
+      auth_user_id: userData.user.id,
+      nome,
+      tipo: "membro",
+      role: "professor",
+    })
+    .select("id")
+    .single();
 
-  if (pessoaError) {
+  if (pessoaError || !pessoaCriada) {
     // Limpa o usuário órfão no Auth pra não deixar lixo pela metade.
     await admin.auth.admin.deleteUser(userData.user.id);
-    return { erro: `Falha ao registrar professor: ${pessoaError.message}` };
+    return { erro: `Falha ao registrar professor: ${pessoaError?.message ?? "sem retorno"}` };
+  }
+
+  // Turma do professor = escala regular (é o que o banco usa em minhas_turmas()).
+  if (turmaIds.length > 0) {
+    const { error: escalaError } = await admin.from("escalas").insert(
+      turmaIds.map((turmaId) => ({
+        turma_id: turmaId,
+        pessoa_id: pessoaCriada.id,
+        data: hojeIso(),
+        tipo: "regular" as const,
+      }))
+    );
+    if (escalaError) {
+      revalidatePath("/professores");
+      return {
+        erro: `Conta criada (senha ${senha}), mas falhou ao vincular a turma: ${escalaError.message}. Vincule em “Editar”.`,
+      };
+    }
   }
 
   revalidatePath("/professores");
+  revalidatePath("/escalas");
   return {
     sucesso: `Conta criada para ${nome}.`,
     senhaGerada: senha,
@@ -107,7 +137,11 @@ export async function resetarSenha(
     return { erro: "Professor inválido." };
   }
 
-  const senha = gerarSenhaProvisoria();
+  const senhaInformada = String(formData.get("senha") ?? "").trim();
+  if (senhaInformada && senhaInformada.length < 6) {
+    return { erro: "A senha precisa ter pelo menos 6 caracteres." };
+  }
+  const senha = senhaInformada || gerarSenhaProvisoria();
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(authUserId, { password: senha });
 
@@ -116,4 +150,63 @@ export async function resetarSenha(
   }
 
   return { senhaGerada: senha };
+}
+
+export interface EstadoTurmasProfessor {
+  erro?: string;
+  sucesso?: string;
+}
+
+// Define em quais turmas o professor dá aula. Marcou → cria a escala
+// regular (se ainda não houver nenhuma nessa turma). Desmarcou → remove as
+// escalas dele naquela turma (o vínculo acaba).
+export async function atualizarTurmasProfessor(
+  _estadoAnterior: EstadoTurmasProfessor,
+  formData: FormData
+): Promise<EstadoTurmasProfessor> {
+  try {
+    await exigirCoordenacao();
+  } catch {
+    return { erro: "Ação restrita à coordenação." };
+  }
+
+  const pessoaId = String(formData.get("pessoaId") ?? "");
+  const marcadas = new Set(formData.getAll("turmaId").map(String).filter(Boolean));
+  if (!pessoaId) return { erro: "Professor inválido." };
+
+  const supabase = createClient();
+  const { data: atuais, error: erroLeitura } = await supabase
+    .from("escalas")
+    .select("turma_id")
+    .eq("pessoa_id", pessoaId);
+  if (erroLeitura) return { erro: `Falha ao ler turmas: ${erroLeitura.message}` };
+
+  const jaTem = new Set((atuais ?? []).map((e) => e.turma_id));
+  const adicionar = [...marcadas].filter((t) => !jaTem.has(t));
+  const remover = [...jaTem].filter((t) => !marcadas.has(t));
+
+  if (adicionar.length > 0) {
+    const { error } = await supabase.from("escalas").insert(
+      adicionar.map((turmaId) => ({
+        turma_id: turmaId,
+        pessoa_id: pessoaId,
+        data: hojeIso(),
+        tipo: "regular" as const,
+      }))
+    );
+    if (error) return { erro: `Falha ao vincular turma: ${error.message}` };
+  }
+  if (remover.length > 0) {
+    const { error } = await supabase
+      .from("escalas")
+      .delete()
+      .eq("pessoa_id", pessoaId)
+      .in("turma_id", remover);
+    if (error) return { erro: `Falha ao desvincular turma: ${error.message}` };
+  }
+
+  revalidatePath("/professores");
+  revalidatePath("/escalas");
+  revalidatePath("/minha-turma");
+  return { sucesso: "Turmas atualizadas." };
 }

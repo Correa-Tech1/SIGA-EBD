@@ -51,7 +51,11 @@ export function Cabecalho({
         })}
       </nav>
 
-      <div className="flex items-center gap-3 text-sm text-white">
+      <a
+        href="/conta"
+        title="Minha conta: trocar senha e sair"
+        className="flex items-center gap-3 text-sm text-white hover:opacity-90"
+      >
         <span
           aria-hidden="true"
           className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-xs font-semibold"
@@ -61,7 +65,7 @@ export function Cabecalho({
         <span>
           {nome} <span className="text-white/60">· {papel}</span>
         </span>
-      </div>
+      </a>
     </header>
   );
 }

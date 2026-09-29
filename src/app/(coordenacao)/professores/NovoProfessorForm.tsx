@@ -18,7 +18,7 @@ function BotaoCriar() {
   );
 }
 
-export function NovoProfessorForm() {
+export function NovoProfessorForm({ turmas }: { turmas: { id: string; nome: string }[] }) {
   const [estado, acao] = useFormState(criarProfessor, estadoInicial);
 
   return (
@@ -27,7 +27,7 @@ export function NovoProfessorForm() {
         Nova conta de professor
       </div>
       <div className="mb-4 mt-1 text-xs text-text-secondary">
-        Você define nome e usuário; o sistema gera a senha provisória.
+        Você define nome, usuário e turma. A senha pode ser escolhida por você ou gerada pelo sistema.
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -49,9 +49,33 @@ export function NovoProfessorForm() {
             className="w-full rounded-lg border border-border px-3 py-2 text-sm"
           />
         </div>
-        <div className="flex items-end">
-          <BotaoCriar />
+        <div className="flex-1 min-w-[200px]">
+          <label className="mb-1 block text-xs text-text-secondary">SENHA (opcional)</label>
+          <input
+            name="senha"
+            type="text"
+            minLength={6}
+            autoComplete="off"
+            placeholder="em branco = o sistema gera"
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+          />
         </div>
+      </div>
+
+      <fieldset className="mt-4">
+        <legend className="mb-1 text-xs text-text-secondary">TURMA(S) DO PROFESSOR</legend>
+        <div className="flex flex-wrap gap-4">
+          {turmas.map((t) => (
+            <label key={t.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="turmaId" value={t.id} className="h-4 w-4 accent-primary" />
+              {t.nome}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="mt-4">
+        <BotaoCriar />
       </div>
 
       {estado.erro && (
@@ -64,7 +88,7 @@ export function NovoProfessorForm() {
         <div className="mt-3 rounded-lg bg-accent/10 p-3 text-sm">
           <strong>{estado.sucesso}</strong>
           <div className="mt-1">
-            Senha provisória: <code className="rounded bg-white px-2 py-0.5">{estado.senhaGerada}</code>
+            Senha: <code className="rounded bg-white px-2 py-0.5">{estado.senhaGerada}</code>
           </div>
           <div className="mt-1 text-xs text-text-secondary">
             Passe essa senha pro professor por fora do sistema (WhatsApp, presencial) —
