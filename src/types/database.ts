@@ -31,6 +31,7 @@ export interface Database {
           telefone: string | null;
           data_nascimento: string | null;
           genero: "M" | "F" | null;
+          professor_tipo: "regular" | "convidado" | null;
           criado_em: string;
         },
         "nome"
@@ -153,6 +154,13 @@ export interface Database {
           atualizado_em: string;
         },
         "pessoa_id" | "titulo"
+      >;
+      professor_turmas: Tabela<
+        {
+          pessoa_id: string;
+          turma_id: string;
+        },
+        "pessoa_id" | "turma_id"
       >;
       preparos: Tabela<
         {

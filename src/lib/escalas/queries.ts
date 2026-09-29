@@ -29,6 +29,30 @@ export interface PessoaSimples {
   nome: string;
 }
 
+export interface ProfessorOpcao {
+  id: string;
+  nome: string;
+  tipo: "regular" | "convidado";
+  daTurma: boolean;
+}
+
+// Só quem foi cadastrado na aba Professores pode ser escalado. Os da turma
+// vêm primeiro (`daTurma`), os demais ficam disponíveis (convidado/substituição).
+export async function listarProfessoresParaEscala(turmaId: string): Promise<ProfessorOpcao[]> {
+  const supabase = createClient();
+  const [{ data: professores }, { data: vinculos }] = await Promise.all([
+    supabase.from("pessoas").select("id, nome, professor_tipo").eq("role", "professor").order("nome"),
+    supabase.from("professor_turmas").select("pessoa_id").eq("turma_id", turmaId),
+  ]);
+  const daTurma = new Set((vinculos ?? []).map((v) => v.pessoa_id));
+  return (professores ?? []).map((p) => ({
+    id: p.id,
+    nome: p.nome,
+    tipo: p.professor_tipo === "convidado" ? "convidado" : "regular",
+    daTurma: daTurma.has(p.id),
+  }));
+}
+
 export async function listarPessoas(): Promise<PessoaSimples[]> {
   const supabase = createClient();
   const { data } = await supabase.from("pessoas").select("id, nome").order("nome");

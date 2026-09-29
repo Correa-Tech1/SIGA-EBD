@@ -38,6 +38,14 @@ export async function criarEscala(
   }
 
   const supabase = createClient();
+  const { data: professor } = await supabase
+    .from("pessoas")
+    .select("id")
+    .eq("id", pessoaId)
+    .eq("role", "professor")
+    .maybeSingle();
+  if (!professor) return { erro: "Só professores cadastrados na aba Professores podem ser escalados." };
+
   const { error } = await supabase.from("escalas").insert({
     turma_id: turmaId,
     pessoa_id: pessoaId,

@@ -1,4 +1,4 @@
-import { listarEscalas, listarAvisos, listarPessoas } from "@/lib/escalas/queries";
+import { listarEscalas, listarAvisos, listarProfessoresParaEscala } from "@/lib/escalas/queries";
 import { FormularioEscala, BotaoRemoverEscala, FormularioAviso, BotaoApagarAviso } from "./ClientForms";
 import { getSessaoAtual } from "@/lib/auth/session";
 import type { Turma } from "@/lib/estrutura/queries";
@@ -20,7 +20,7 @@ export async function PainelEscalas({
   const [escalas, avisos, pessoas, sessao] = await Promise.all([
     listarEscalas(turma.id),
     listarAvisos(turma.id),
-    podeGerenciar ? listarPessoas() : Promise.resolve([]),
+    podeGerenciar ? listarProfessoresParaEscala(turma.id) : Promise.resolve([]),
     getSessaoAtual(),
   ]);
 
@@ -57,7 +57,7 @@ export async function PainelEscalas({
 
         {podeGerenciar && (
           <div className="mt-3">
-            <FormularioEscala turmaId={turma.id} pessoas={pessoas} />
+            <FormularioEscala turmaId={turma.id} professores={pessoas} />
           </div>
         )}
       </div>

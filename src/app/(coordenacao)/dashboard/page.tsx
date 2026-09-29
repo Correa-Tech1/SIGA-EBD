@@ -1,7 +1,5 @@
 import { getSessaoAtual } from "@/lib/auth/session";
-import { createClient } from "@/lib/supabase/server";
-import { proximosDomingos, fmtDomingo } from "@/lib/auxilio/mesa";
-import { carregarRelatorio, hojeIso } from "@/lib/relatorio/dados";
+import { carregarRelatorio } from "@/lib/relatorio/dados";
 import { corDaTurma } from "@/lib/relatorio/cores";
 import { fmtDataCurta, fmtNum, fmtPct } from "@/lib/relatorio/motor";
 import { GraficoLinhas } from "@/components/relatorio/GraficoLinhas";
@@ -20,18 +18,6 @@ export default async function DashboardPage() {
   const mediaGeral = totais.length ? totais.reduce((s, [, v]) => s + v, 0) / totais.length : 0;
   const ultimo = totais[totais.length - 1];
   const pctAdultos = r.igreja.adultos ? (r.igreja.passaram / r.igreja.adultos) * 100 : 0;
-
-  // Prontidão do próximo domingo: só o andamento do preparo (tabela `preparos`),
-  // nunca o conteúdo. Se o SQL 0010 ainda não rodou, a seção some.
-  const proxDomingo = proximosDomingos(hojeIso(), 1)[0];
-  const supabase = createClient();
-  const { data: preparosDomingo, error: erroPreparos } = await supabase
-    .from("preparos")
-    .select("turma_id, pessoa_id, titulo, etapas_prontas, etapas_total, slides_gerados, atualizado_em")
-    .eq("data", proxDomingo);
-  const { data: pessoasPrep } = preparosDomingo?.length
-    ? await supabase.from("pessoas_publicas").select("id, nome").in("id", preparosDomingo.map((p) => p.pessoa_id))
-    : { data: [] as { id: string; nome: string }[] };
 
   const periodo = semestre ? `${semestre.periodo}º semestre de ${semestre.ano}` : "Semestre atual";
 
@@ -63,56 +49,6 @@ export default async function DashboardPage() {
           ))}
         </ul>
       </section>
-
-      {!erroPreparos && (
-        <section aria-labelledby="titulo-prontidao" className="space-y-3">
-          <h2 id="titulo-prontidao" className="font-display text-lg font-semibold text-primary">
-            Prontidão de domingo — {fmtDomingo(proxDomingo)}
-          </h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {r.turmas.map((t) => {
-              const ps = (preparosDomingo ?? []).filter((p) => p.turma_id === t.turma.id);
-              const cor = corDaTurma(t.turma.nome);
-              return (
-                <div
-                  key={t.turma.id}
-                  className="rounded-xl border border-border bg-surface p-5"
-                  style={{ borderTop: `5px solid ${cor}` }}
-                >
-                  <div className="font-display text-lg font-semibold">{t.turma.nome}</div>
-                  {ps.length === 0 ? (
-                    <p className="mt-2 text-sm text-text-secondary">Preparo ainda não iniciado.</p>
-                  ) : (
-                    ps.map((p) => {
-                      const nome = pessoasPrep?.find((x) => x.id === p.pessoa_id)?.nome ?? "Professor";
-                      const pct = Math.round((p.etapas_prontas / (p.etapas_total || 6)) * 100);
-                      return (
-                        <div key={p.pessoa_id} className="mt-3">
-                          <div className="flex justify-between text-sm">
-                            <span>{nome}</span>
-                            <span className="text-text-secondary">
-                              {p.etapas_prontas} de {p.etapas_total} etapas
-                            </span>
-                          </div>
-                          <div className="mt-1 h-2 overflow-hidden rounded-full bg-border-light">
-                            <div className="h-full" style={{ width: `${pct}%`, background: cor }} />
-                          </div>
-                          <p className="mt-1 text-xs text-text-secondary">
-                            Slides: {p.slides_gerados ? "gerados" : "não gerados"}
-                          </p>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-xs text-text-secondary">
-            Mostra só o andamento. O conteúdo das conversas e dos rascunhos é de cada professor.
-          </p>
-        </section>
-      )}
 
       {r.aulas === 0 ? (
         <p className="rounded-xl border border-border bg-surface p-6 text-sm text-text-secondary">

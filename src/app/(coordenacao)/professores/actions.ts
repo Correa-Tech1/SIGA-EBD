@@ -57,6 +57,7 @@ export async function criarProfessor(
   }
   const senha = senhaInformada || gerarSenhaProvisoria();
   const turmaIds = formData.getAll("turmaId").map(String).filter(Boolean);
+  const professorTipo = String(formData.get("professorTipo") ?? "regular") === "convidado" ? "convidado" : "regular";
   const admin = createAdminClient();
 
   const { data: userData, error: userError } = await admin.auth.admin.createUser({
@@ -81,6 +82,7 @@ export async function criarProfessor(
       nome,
       tipo: "membro",
       role: "professor",
+      professor_tipo: professorTipo,
     })
     .select("id")
     .single();
@@ -91,20 +93,15 @@ export async function criarProfessor(
     return { erro: `Falha ao registrar professor: ${pessoaError?.message ?? "sem retorno"}` };
   }
 
-  // Turma do professor = escala regular (é o que o banco usa em minhas_turmas()).
+  // Turma do professor = vínculo próprio (não é escala: escala é aula marcada).
   if (turmaIds.length > 0) {
-    const { error: escalaError } = await admin.from("escalas").insert(
-      turmaIds.map((turmaId) => ({
-        turma_id: turmaId,
-        pessoa_id: pessoaCriada.id,
-        data: hojeIso(),
-        tipo: "regular" as const,
-      }))
-    );
-    if (escalaError) {
+    const { error: vinculoError } = await admin
+      .from("professor_turmas")
+      .insert(turmaIds.map((turmaId) => ({ turma_id: turmaId, pessoa_id: pessoaCriada.id })));
+    if (vinculoError) {
       revalidatePath("/professores");
       return {
-        erro: `Conta criada (senha ${senha}), mas falhou ao vincular a turma: ${escalaError.message}. Vincule em “Editar”.`,
+        erro: `Conta criada (senha ${senha}), mas falhou ao vincular a turma: ${vinculoError.message}. Vincule em “Editar”.`,
       };
     }
   }
@@ -176,7 +173,7 @@ export async function atualizarTurmasProfessor(
 
   const supabase = createClient();
   const { data: atuais, error: erroLeitura } = await supabase
-    .from("escalas")
+    .from("professor_turmas")
     .select("turma_id")
     .eq("pessoa_id", pessoaId);
   if (erroLeitura) return { erro: `Falha ao ler turmas: ${erroLeitura.message}` };
@@ -186,19 +183,14 @@ export async function atualizarTurmasProfessor(
   const remover = [...jaTem].filter((t) => !marcadas.has(t));
 
   if (adicionar.length > 0) {
-    const { error } = await supabase.from("escalas").insert(
-      adicionar.map((turmaId) => ({
-        turma_id: turmaId,
-        pessoa_id: pessoaId,
-        data: hojeIso(),
-        tipo: "regular" as const,
-      }))
-    );
+    const { error } = await supabase
+      .from("professor_turmas")
+      .insert(adicionar.map((turmaId) => ({ turma_id: turmaId, pessoa_id: pessoaId })));
     if (error) return { erro: `Falha ao vincular turma: ${error.message}` };
   }
   if (remover.length > 0) {
     const { error } = await supabase
-      .from("escalas")
+      .from("professor_turmas")
       .delete()
       .eq("pessoa_id", pessoaId)
       .in("turma_id", remover);
@@ -209,4 +201,25 @@ export async function atualizarTurmasProfessor(
   revalidatePath("/escalas");
   revalidatePath("/minha-turma");
   return { sucesso: "Turmas atualizadas." };
+}
+
+export async function atualizarTipoProfessor(
+  _estadoAnterior: EstadoTurmasProfessor,
+  formData: FormData
+): Promise<EstadoTurmasProfessor> {
+  try {
+    await exigirCoordenacao();
+  } catch {
+    return { erro: "Ação restrita à coordenação." };
+  }
+  const pessoaId = String(formData.get("pessoaId") ?? "");
+  const tipo = String(formData.get("professorTipo") ?? "") === "convidado" ? "convidado" : "regular";
+  if (!pessoaId) return { erro: "Professor inválido." };
+  const supabase = createClient();
+  const { error } = await supabase.from("pessoas").update({ professor_tipo: tipo }).eq("id", pessoaId);
+  if (error) return { erro: `Falha ao salvar: ${error.message}` };
+  revalidatePath("/professores");
+  revalidatePath("/escalas");
+  revalidatePath("/coordenacao");
+  return { sucesso: "Tipo atualizado." };
 }

@@ -63,6 +63,20 @@ export function NovoProfessorForm({ turmas }: { turmas: { id: string; nome: stri
       </div>
 
       <fieldset className="mt-4">
+        <legend className="mb-1 text-xs text-text-secondary">TIPO DE PROFESSOR</legend>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="professorTipo" value="regular" defaultChecked className="h-4 w-4 accent-primary" />
+            Regular
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="professorTipo" value="convidado" className="h-4 w-4 accent-primary" />
+            Convidado
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset className="mt-4">
         <legend className="mb-1 text-xs text-text-secondary">TURMA(S) DO PROFESSOR</legend>
         <div className="flex flex-wrap gap-4">
           {turmas.map((t) => (

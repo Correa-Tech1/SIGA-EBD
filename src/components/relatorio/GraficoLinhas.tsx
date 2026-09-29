@@ -1,6 +1,10 @@
 // Gráfico de linhas em SVG puro (renderiza no servidor, imprime bem).
 // Eixo X em escala de tempo: cada domingo fica na posição real, então uma
 // semana sem aula aparece como intervalo. Uma cor por série (turma).
+// Cliente só para o hover: passar o cursor (ou tocar) num ponto mostra o valor.
+"use client";
+
+import { useState } from "react";
 import { fmtDataCurta } from "@/lib/relatorio/motor";
 
 export interface SerieLinha {
@@ -15,11 +19,16 @@ export function GraficoLinhas({
   series,
   descricao,
   altura = 260,
+  minimoY,
+  casas = 0,
 }: {
   series: SerieLinha[];
   descricao: string;
   altura?: number;
+  minimoY?: number; // eixo Y começa aqui em vez de 0 (ex.: idade média)
+  casas?: number; // casas decimais do valor mostrado
 }) {
+  const [foco, setFoco] = useState<{ serie: string; cor: string; data: string; valor: number } | null>(null);
   const datas = [...new Set(series.flatMap((s) => s.pontos.map((p) => p.data)))].sort();
   if (datas.length === 0) {
     return (
@@ -38,12 +47,13 @@ export function GraficoLinhas({
   const plotW = largura - mEsq - mDir;
 
   const maximo = Math.max(...series.flatMap((s) => s.pontos.map((p) => p.valor)), 1);
-  const teto = maximo <= 5 ? 5 : Math.ceil(maximo / 5) * 5;
+  const base = minimoY ?? 0;
+  const teto = minimoY !== undefined ? Math.ceil(maximo / 5) * 5 : maximo <= 5 ? 5 : Math.ceil(maximo / 5) * 5;
   const d0 = dia(datas[0]);
   const d1 = dia(datas[datas.length - 1]);
   const x = (iso: string) => (d1 === d0 ? mEsq + plotW / 2 : mEsq + ((dia(iso) - d0) / (d1 - d0)) * plotW);
-  const y = (v: number) => topo + plotH - (v / teto) * plotH;
-  const marcas = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(teto * f));
+  const y = (v: number) => topo + plotH - ((v - base) / (teto - base || 1)) * plotH;
+  const marcas = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(base + (teto - base) * f));
 
   return (
     <figure className="rounded-xl border border-border bg-surface p-5 print:break-inside-avoid">
@@ -75,15 +85,47 @@ export function GraficoLinhas({
                 points={pts.map((p) => `${x(p.data)},${y(p.valor)}`).join(" ")}
               />
               {pts.map((p) => (
-                <g key={p.data}>
-                  <circle cx={x(p.data)} cy={y(p.valor)} r={4.5} fill="#fff" stroke={s.cor} strokeWidth={2.5}>
-                    <title>{`${s.nome} · ${fmtDataCurta(p.data)}: ${p.valor}`}</title>
-                  </circle>
+                <g
+                  key={p.data}
+                  onPointerEnter={() => setFoco({ serie: s.nome, cor: s.cor, data: p.data, valor: p.valor })}
+                  onPointerDown={() => setFoco({ serie: s.nome, cor: s.cor, data: p.data, valor: p.valor })}
+                  onPointerLeave={() => setFoco(null)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <circle cx={x(p.data)} cy={y(p.valor)} r={14} fill="transparent" />
+                  <circle
+                    cx={x(p.data)}
+                    cy={y(p.valor)}
+                    r={foco?.serie === s.nome && foco.data === p.data ? 6.5 : 4.5}
+                    fill={foco?.serie === s.nome && foco.data === p.data ? s.cor : "#fff"}
+                    stroke={s.cor}
+                    strokeWidth={2.5}
+                  />
                 </g>
               ))}
             </g>
           );
         })}
+        {foco && (() => {
+          const txt = `${fmtDataCurta(foco.data)} · ${foco.valor.toFixed(casas).replace(".", ",")}`;
+          const w = Math.max(txt.length, foco.serie.length) * 6.6 + 16;
+          const px = x(foco.data);
+          const py = y(foco.valor);
+          const bx = Math.min(Math.max(px - w / 2, 4), largura - w - 4);
+          const porCima = py - 52 > 0;
+          const by = porCima ? py - 52 : py + 12;
+          return (
+            <g pointerEvents="none">
+              <rect x={bx} y={by} width={w} height={40} rx={6} fill="#101E24" />
+              <text x={bx + 8} y={by + 16} fontSize={11} fill={foco.cor === "#101E24" ? "#fff" : "#DCE6E8"}>
+                {foco.serie}
+              </text>
+              <text x={bx + 8} y={by + 32} fontSize={13} fontWeight={600} fill="#fff">
+                {txt}
+              </text>
+            </g>
+          );
+        })()}
       </svg>
       <figcaption className="mt-2 flex flex-wrap gap-5 text-xs text-text-secondary">
         {series.map((s) => (

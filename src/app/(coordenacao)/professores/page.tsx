@@ -5,6 +5,7 @@ import { corDaTurma } from "@/lib/relatorio/cores";
 import { NovoProfessorForm } from "./NovoProfessorForm";
 import { ResetarSenhaBotao } from "./ResetarSenhaBotao";
 import { TurmasProfessorForm } from "./TurmasProfessorForm";
+import { TipoProfessorForm } from "./TipoProfessorForm";
 
 // Server Component: lê com o cliente de SESSÃO (não o admin) — a policy
 // `pessoas_coordenacao_all` do RLS já garante que só quem é coordenação
@@ -14,18 +15,18 @@ import { TurmasProfessorForm } from "./TurmasProfessorForm";
 // seguro aqui porque o layout da coordenação já barrou quem não é coordenação.
 export default async function ProfessoresPage() {
   const supabase = createClient();
-  const [{ data: professores }, turmas, { data: escalas }] = await Promise.all([
+  const [{ data: professores }, turmas, { data: vinculos }] = await Promise.all([
     supabase
       .from("pessoas")
-      .select("id, nome, auth_user_id, criado_em")
+      .select("id, nome, auth_user_id, criado_em, professor_tipo")
       .eq("role", "professor")
       .order("nome"),
     listarTurmas(),
-    supabase.from("escalas").select("pessoa_id, turma_id"),
+    supabase.from("professor_turmas").select("pessoa_id, turma_id"),
   ]);
 
   const turmasPorPessoa = new Map<string, Set<string>>();
-  for (const e of escalas ?? []) {
+  for (const e of vinculos ?? []) {
     const set = turmasPorPessoa.get(e.pessoa_id) ?? new Set<string>();
     set.add(e.turma_id);
     turmasPorPessoa.set(e.pessoa_id, set);
@@ -69,7 +70,16 @@ export default async function ProfessoresPage() {
             <details key={p.id} className="rounded-xl border border-border bg-surface">
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
                 <div>
-                  <div className="text-sm font-medium">{p.nome}</div>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    {p.nome}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        p.professor_tipo === "convidado" ? "bg-accent/20 text-[#8A5A00]" : "bg-primary/10 text-primary"
+                      }`}
+                    >
+                      {p.professor_tipo === "convidado" ? "Convidado" : "Regular"}
+                    </span>
+                  </div>
                   <div className="text-xs text-text-secondary">
                     usuário: <code>{usuarios.get(p.id) || "—"}</code> · criada em{" "}
                     {new Date(p.criado_em).toLocaleDateString("pt-BR")}
@@ -95,6 +105,7 @@ export default async function ProfessoresPage() {
                 </div>
               </summary>
               <div className="grid gap-6 border-t border-border-light px-6 py-4 sm:grid-cols-2">
+                <TipoProfessorForm pessoaId={p.id} tipo={p.professor_tipo === "convidado" ? "convidado" : "regular"} />
                 <TurmasProfessorForm pessoaId={p.id} turmas={turmasSimples} marcadas={marcadas} />
                 {p.auth_user_id && <ResetarSenhaBotao authUserId={p.auth_user_id} />}
               </div>

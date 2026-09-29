@@ -50,6 +50,44 @@ export interface EntradaPresenca {
 export const FAIXAS = ["18-25", "26-35", "36-45", "46-55", "56-65", "66+"] as const;
 export type Faixa = (typeof FAIXAS)[number];
 
+// Para o perfil por aula entram também os menores de 18 (visitantes/crianças na sala).
+export const FAIXAS_ETARIAS = ["até 17", ...FAIXAS] as const;
+export type FaixaEtaria = (typeof FAIXAS_ETARIAS)[number];
+export type ContagemFaixas = Record<FaixaEtaria, number>;
+
+export interface PerfilData {
+  data: string;
+  presentes: number;
+  comIdade: number; // presentes com data de nascimento conhecida
+  idadeMedia: number | null;
+  faixas: ContagemFaixas;
+}
+export interface PerfilEtario {
+  datas: PerfilData[];
+  idadeMediaPrimeira: number | null;
+  idadeMediaSegunda: number | null;
+  faixasPrimeira: ContagemFaixas; // presenças (não pessoas) por faixa na 1ª metade
+  faixasSegunda: ContagemFaixas;
+}
+export interface TrechoTurma {
+  turma: string;
+  aulas: number;
+  primeira: string;
+  ultima: string;
+}
+export interface Migracao {
+  id: string;
+  nome: string;
+  tipo: "migrou" | "duas"; // migrou = saiu de uma turma e passou a outra; duas = frequenta as duas
+  trajeto: TrechoTurma[]; // cronológico
+}
+export interface NuncaFoi {
+  id: string;
+  nome: string;
+  idade: number | null;
+  genero: Genero | null;
+}
+
 export interface PontoData {
   data: string;
   presentes: number;
@@ -93,6 +131,7 @@ export interface RelatorioTurma {
   referencia: { rotulo: string; total: number } | null;
   participacaoPct: number | null;
   frequentesAbaixoReferencia: string[]; // frequentes fora do público de referência (ex.: < 45 no Panorama)
+  perfil: PerfilEtario;
 }
 export interface LinhaFaixa {
   faixa: Faixa;
@@ -121,6 +160,8 @@ export interface RelatorioGeral {
     idadeConhecida: number; // pessoas da EBD com idade cruzada
   };
   faixas: LinhaFaixa[];
+  migracoes: Migracao[];
+  nuncaForam: NuncaFoi[]; // membros adultos que não estiveram em nenhuma aula
 }
 
 export function idadeEm(nascimento: string | null, hoje: string): number | null {
@@ -141,6 +182,13 @@ export function faixaDaIdade(idade: number): Faixa | null {
   if (idade <= 55) return "46-55";
   if (idade <= 65) return "56-65";
   return "66+";
+}
+
+function faixaAmpla(idade: number): FaixaEtaria {
+  return idade < 18 ? "até 17" : (faixaDaIdade(idade) as FaixaEtaria);
+}
+function faixasVazias(): ContagemFaixas {
+  return Object.fromEntries(FAIXAS_ETARIAS.map((f) => [f, 0])) as ContagemFaixas;
 }
 
 function media(valores: number[]): number | null {
@@ -259,9 +307,41 @@ export function montarRelatorio(entrada: {
       dentro = (l) => (l.idade ?? 45) >= 45;
     }
 
+    const perfilDatas: PerfilData[] = datasOrdenadas.map((d) => {
+      const faixas = faixasVazias();
+      const idades: number[] = [];
+      let presentes = 0;
+      for (const [pessoaId, setDatas] of mapa) {
+        if (!setDatas.has(d)) continue;
+        presentes += 1;
+        const i = idade(pessoaId);
+        if (i === null) continue;
+        idades.push(i);
+        faixas[faixaAmpla(i)] += 1;
+      }
+      return { data: d, presentes, comIdade: idades.length, idadeMedia: media(idades), faixas };
+    });
+    const somaFaixas = (ds_: string[]) => {
+      const total = faixasVazias();
+      for (const pd of perfilDatas) if (ds_.includes(pd.data)) for (const f of FAIXAS_ETARIAS) total[f] += pd.faixas[f];
+      return total;
+    };
+    const mediaPonderada = (ds_: string[]) => {
+      const pesos = perfilDatas.filter((pd) => ds_.includes(pd.data) && pd.idadeMedia !== null);
+      const n_ = pesos.reduce((s_, pd) => s_ + pd.comIdade, 0);
+      return n_ === 0 ? null : pesos.reduce((s_, pd) => s_ + (pd.idadeMedia as number) * pd.comIdade, 0) / n_;
+    };
+
     return {
       turma,
       datas,
+      perfil: {
+        datas: perfilDatas,
+        idadeMediaPrimeira: mediaPonderada(dp),
+        idadeMediaSegunda: mediaPonderada(ds),
+        faixasPrimeira: somaFaixas(dp),
+        faixasSegunda: somaFaixas(ds),
+      },
       pessoas: linhas,
       distintas: linhas.length,
       membros: linhas.filter((l) => l.membro).length,
@@ -307,6 +387,38 @@ export function montarRelatorio(entrada: {
     };
   });
 
+  // quem passou por mais de uma turma: migrou (sequencial) ou frequenta as duas
+  const migracoes: Migracao[] = [];
+  for (const [pessoaId, c] of contagemPorTurma) {
+    if (c.size < 2) continue;
+    const trajeto: TrechoTurma[] = [];
+    for (const [turmaId] of c) {
+      const datas_ = [...(porTurma.get(turmaId)?.get(pessoaId) ?? [])].sort();
+      if (datas_.length === 0) continue;
+      trajeto.push({
+        turma: turmas.find((t) => t.id === turmaId)?.nome ?? "Turma",
+        aulas: datas_.length,
+        primeira: datas_[0],
+        ultima: datas_[datas_.length - 1],
+      });
+    }
+    if (trajeto.length < 2) continue;
+    trajeto.sort((a, b) => a.primeira.localeCompare(b.primeira));
+    const sequencial = trajeto.every((t, i) => i === 0 || trajeto[i - 1].ultima < t.primeira);
+    migracoes.push({
+      id: pessoaId,
+      nome: pessoaPorId.get(pessoaId)?.nome ?? "",
+      tipo: sequencial ? "migrou" : "duas",
+      trajeto,
+    });
+  }
+  migracoes.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+  const nuncaForam: NuncaFoi[] = membrosAdultos
+    .filter((p) => (totalPorPessoa.get(p.id) ?? 0) === 0)
+    .map((p) => ({ id: p.id, nome: p.nome, idade: idade(p.id), genero: p.genero }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
   return {
     hoje,
     inicio: todasDatas[0] ?? null,
@@ -327,6 +439,8 @@ export function montarRelatorio(entrada: {
       idadeConhecida: idsEbd.filter((id) => idade(id) !== null).length,
     },
     faixas,
+    migracoes,
+    nuncaForam,
   };
 }
 
@@ -395,4 +509,31 @@ export function textoIdade(t: RelatorioTurma): string | null {
   }
   const jovemMais = f < u;
   return `Idade: os frequentes têm média de ${fmtNum(f)} anos, contra ${fmtNum(e)} dos esporádicos e ${fmtNum(u)} dos que vieram uma única vez. ${jovemMais ? "Quanto mais jovem, maior a frequência" : "Quanto mais velho, maior a frequência"} nesta turma.`;
+}
+
+export function textoPerfilEtario(t: RelatorioTurma): string {
+  const pf = t.perfil;
+  if (t.primeiraMetade.datas.length === 0 || pf.idadeMediaPrimeira === null || pf.idadeMediaSegunda === null) {
+    return "Ainda não há aulas (ou datas de nascimento) suficientes para comparar o perfil das duas metades.";
+  }
+  const soma = (c: ContagemFaixas) => FAIXAS_ETARIAS.reduce((s_, f) => s_ + c[f], 0);
+  const a = soma(pf.faixasPrimeira);
+  const b = soma(pf.faixasSegunda);
+  const dif = pf.idadeMediaSegunda - pf.idadeMediaPrimeira;
+  const cabeca =
+    Math.abs(dif) < 1
+      ? `A idade média da sala ficou praticamente igual (${fmtNum(pf.idadeMediaPrimeira)} → ${fmtNum(pf.idadeMediaSegunda)} anos).`
+      : `A idade média da sala ${dif > 0 ? "subiu" : "caiu"} de ${fmtNum(pf.idadeMediaPrimeira)} para ${fmtNum(pf.idadeMediaSegunda)} anos (${dif > 0 ? "+" : "-"}${fmtNum(Math.abs(dif))}).`;
+  if (a === 0 || b === 0) return cabeca;
+  const variacao = FAIXAS_ETARIAS.map((f) => ({ f, pp: (pf.faixasSegunda[f] / b) * 100 - (pf.faixasPrimeira[f] / a) * 100 }));
+  const ganhou = [...variacao].sort((x, y) => y.pp - x.pp)[0];
+  const perdeu = [...variacao].sort((x, y) => x.pp - y.pp)[0];
+  if (ganhou.pp < 3 && perdeu.pp > -3) return `${cabeca} A distribuição por faixa etária não mudou de forma relevante.`;
+  const pct = (c: ContagemFaixas, tot: number, f: FaixaEtaria) => fmtPct((c[f] / tot) * 100);
+  const frases: string[] = [];
+  if (ganhou.pp >= 3)
+    frases.push(`A faixa ${ganhou.f} ganhou espaço (${pct(pf.faixasPrimeira, a, ganhou.f)} → ${pct(pf.faixasSegunda, b, ganhou.f)} das presenças).`);
+  if (perdeu.pp <= -3)
+    frases.push(`A faixa ${perdeu.f} perdeu (${pct(pf.faixasPrimeira, a, perdeu.f)} → ${pct(pf.faixasSegunda, b, perdeu.f)}).`);
+  return `${cabeca} ${frases.join(" ")}`;
 }

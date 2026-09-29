@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import {
   criarEscala,
@@ -8,7 +9,7 @@ import {
   apagarAviso,
   type EstadoForm,
 } from "@/lib/escalas/actions";
-import type { PessoaSimples } from "@/lib/escalas/queries";
+import type { ProfessorOpcao } from "@/lib/escalas/queries";
 import type { Turma } from "@/lib/estrutura/queries";
 
 const estadoInicial: EstadoForm = {};
@@ -39,19 +40,40 @@ function Mensagens({ estado }: { estado: EstadoForm }) {
   );
 }
 
-export function FormularioEscala({ turmaId, pessoas }: { turmaId: string; pessoas: PessoaSimples[] }) {
+export function FormularioEscala({ turmaId, professores }: { turmaId: string; professores: ProfessorOpcao[] }) {
   const [estado, acao] = useFormState(criarEscala, estadoInicial);
+  const [tipo, setTipo] = useState<string>(professores.find((p) => p.daTurma)?.tipo ?? professores[0]?.tipo ?? "regular");
+  const daTurma = professores.filter((p) => p.daTurma);
+  const outros = professores.filter((p) => !p.daTurma);
+  if (professores.length === 0) {
+    return (
+      <p className="rounded-lg bg-bg p-3 text-sm text-text-secondary">
+        Nenhum professor cadastrado. Crie a conta na aba Professores para poder escalar.
+      </p>
+    );
+  }
+  const opcao = (p: ProfessorOpcao) => (
+    <option key={p.id} value={p.id}>
+      {p.nome}
+      {p.tipo === "convidado" ? " (convidado)" : ""}
+    </option>
+  );
   return (
     <form action={acao} className="flex flex-wrap items-end gap-3 rounded-lg bg-bg p-3">
       <input type="hidden" name="turmaId" value={turmaId} />
-      <div className="min-w-[180px]">
-        <label className="mb-1 block text-xs text-text-secondary">PESSOA</label>
-        <select name="pessoaId" required className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-          {pessoas.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nome}
-            </option>
-          ))}
+      <div className="min-w-[200px]">
+        <label className="mb-1 block text-xs text-text-secondary">PROFESSOR</label>
+        <select
+          name="pessoaId"
+          required
+          onChange={(e) => {
+            const escolhido = professores.find((p) => p.id === e.target.value);
+            if (escolhido) setTipo(escolhido.tipo);
+          }}
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+        >
+          {daTurma.length > 0 && <optgroup label="Desta turma">{daTurma.map(opcao)}</optgroup>}
+          {outros.length > 0 && <optgroup label="Outros professores">{outros.map(opcao)}</optgroup>}
         </select>
       </div>
       <div>
@@ -65,7 +87,12 @@ export function FormularioEscala({ turmaId, pessoas }: { turmaId: string; pessoa
       </div>
       <div>
         <label className="mb-1 block text-xs text-text-secondary">TIPO</label>
-        <select name="tipo" className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+        <select
+          name="tipo"
+          value={tipo}
+          onChange={(e) => setTipo(e.target.value)}
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+        >
           <option value="regular">Regular</option>
           <option value="convidado">Convidado</option>
           <option value="substituicao">Substituição</option>
