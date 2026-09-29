@@ -35,6 +35,7 @@ export function UploadBiblioteca({
     const prefixo = String(dados.get("titulo") ?? "").trim();
     const turmaId = String(dados.get("turmaId") ?? "");
     if (arquivos.length === 0) return setStatus({ tipo: "erro", texto: "Escolha ao menos um arquivo." });
+    if (categoria === "aula" && !turmaId) return setStatus({ tipo: "erro", texto: "Escolha a turma da aula." });
 
     const supabase = createClient();
     const pasta = categoria === "livro" ? "livros/geral" : categoria === "institucional" ? "institucional/geral" : `aulas/${pessoaId}`;
@@ -51,7 +52,8 @@ export function UploadBiblioteca({
 
       const semExt = arquivo.name.replace(/\.[^./]+$/, "");
       const titulo = prefixo && arquivos.length === 1 ? prefixo : prefixo ? `${prefixo} — ${semExt}` : semExt;
-      const r = await registrarMaterial({ categoria, titulo, tipo: ext, caminho, turmaId: turmaId || null });
+      const papel = String(dados.get("papel") ?? "");
+      const r = await registrarMaterial({ categoria, titulo, tipo: ext, caminho, turmaId: turmaId || null, papel: papel || null });
       if (r.erro) return setStatus({ tipo: "erro", texto: r.erro });
       enviados += 1;
     }
@@ -69,10 +71,19 @@ export function UploadBiblioteca({
         <div>
           <label className="mb-1 block text-xs text-text-secondary">TURMA</label>
           <select name="turmaId" defaultValue={turmaPadrao ?? ""} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-            <option value="">Todas</option>
+            {categoria === "aula" ? <option value="">Escolha…</option> : <option value="">Todas</option>}
             {turmas.map((t) => (
               <option key={t.id} value={t.id}>{t.nome}</option>
             ))}
+          </select>
+        </div>
+      )}
+      {categoria === "aula" && (
+        <div>
+          <label className="mb-1 block text-xs text-text-secondary">TIPO</label>
+          <select name="papel" defaultValue="slides" className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+            <option value="slides">Slides da aula</option>
+            <option value="apoio">Material de apoio</option>
           </select>
         </div>
       )}

@@ -11,6 +11,7 @@ export interface Material {
   caminho_arquivo: string;
   categoria: "livro" | "institucional" | "aula";
   turma_id: string | null;
+  papel: "slides" | "apoio" | null;
   criado_em: string;
 }
 
@@ -27,7 +28,7 @@ export async function listarMateriaisOficiais(moduloId: string): Promise<Materia
   const { data } = await supabase
     .from("materiais")
     .select(
-      "id, origem, modulo_id, aula_id, enviado_por, titulo, tipo_arquivo, caminho_arquivo, categoria, turma_id, criado_em"
+      "id, origem, modulo_id, aula_id, enviado_por, titulo, tipo_arquivo, caminho_arquivo, categoria, turma_id, papel, criado_em"
     )
     .eq("origem", "oficial")
     .eq("modulo_id", moduloId)
@@ -40,7 +41,7 @@ export async function listarMateriaisDeAula(aulaId: string): Promise<Material[]>
   const { data } = await supabase
     .from("materiais")
     .select(
-      "id, origem, modulo_id, aula_id, enviado_por, titulo, tipo_arquivo, caminho_arquivo, categoria, turma_id, criado_em"
+      "id, origem, modulo_id, aula_id, enviado_por, titulo, tipo_arquivo, caminho_arquivo, categoria, turma_id, papel, criado_em"
     )
     .eq("origem", "de_aula")
     .eq("aula_id", aulaId)
@@ -59,7 +60,7 @@ export async function listarPrateleira(
   let consulta = supabase
     .from("materiais")
     .select(
-      "id, origem, modulo_id, aula_id, enviado_por, titulo, tipo_arquivo, caminho_arquivo, categoria, turma_id, criado_em"
+      "id, origem, modulo_id, aula_id, enviado_por, titulo, tipo_arquivo, caminho_arquivo, categoria, turma_id, papel, criado_em"
     )
     .eq("categoria", categoria)
     .order("criado_em", { ascending: false });

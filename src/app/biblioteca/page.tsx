@@ -3,6 +3,7 @@ import { listarPrateleira, nomesDePessoas } from "@/lib/biblioteca/queries";
 import { ListaMateriais } from "@/components/biblioteca/ListaMateriais";
 import { UploadBiblioteca } from "@/components/biblioteca/UploadBiblioteca";
 import { getSessaoAtual } from "@/lib/auth/session";
+import { listarMinhasTurmasIds } from "@/lib/frequencia/queries";
 import { corDaTurma } from "@/lib/relatorio/cores";
 
 // Biblioteca da EBD em três prateleiras. Leitura para todos (inclusive quem
@@ -22,7 +23,23 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
   ]);
   const autores = await nomesDePessoas(aulas.map((m) => m.enviado_por).filter((x): x is string => !!x));
   const turmaPorId = new Map(turmas.map((t) => [t.id, t.nome]));
-  const turmasSimples = turmas.map((t) => ({ id: t.id, nome: t.nome }));
+  const minhas = ehProf ? await listarMinhasTurmasIds() : [];
+  // professor publica só nas turmas dele; coordenação, em qualquer uma
+  const turmasSimples = turmas.filter((t) => ehCoord || minhas.includes(t.id)).map((t) => ({ id: t.id, nome: t.nome }));
+  const detalheAula = (m: (typeof aulas)[number]) =>
+    [
+      m.enviado_por ? `por ${autores.get(m.enviado_por) ?? "professor"}` : null,
+      new Date(m.criado_em).toLocaleDateString("pt-BR"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  const podeApagarAula = (m: (typeof aulas)[number]) => ehCoord || (ehProf && m.enviado_por === sessao.pessoaId);
+  const gruposAula = [
+    ...turmas.filter((t) => !turmaFiltro || t.id === turmaFiltro.id).map((t) => ({ id: t.id as string | null, nome: t.nome })),
+    ...(!turmaFiltro ? [{ id: null as string | null, nome: "Sem turma definida" }] : []),
+  ]
+    .map((g) => ({ ...g, itens: aulas.filter((m) => (m.turma_id ?? null) === g.id) }))
+    .filter((g) => g.id !== null || g.itens.length > 0);
 
   const prateleiras = [
     { id: "livros", titulo: "Livros", descricao: "Os livros-base de cada módulo e obras de apoio.", itens: livros },
@@ -79,19 +96,25 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
             </a>
           ))}
         </div>
-        <ListaMateriais
-          materiais={aulas}
-          podeApagar={(m) => ehCoord || (ehProf && m.enviado_por === sessao.pessoaId)}
-          detalhe={(m) =>
-            [
-              m.turma_id ? turmaPorId.get(m.turma_id) : null,
-              m.enviado_por ? `por ${autores.get(m.enviado_por) ?? "professor"}` : null,
-              new Date(m.criado_em).toLocaleDateString("pt-BR"),
-            ]
-              .filter(Boolean)
-              .join(" · ")
-          }
-        />
+        <div className="space-y-5">
+          {gruposAula.map((g) => (
+            <div key={g.id ?? "sem"} className="rounded-lg border border-border-light p-4" style={g.id ? { borderLeft: `4px solid ${corDaTurma(g.nome)}` } : undefined}>
+              <h3 className="mb-3 font-display text-base font-semibold" style={g.id ? { color: corDaTurma(g.nome) } : undefined}>
+                {g.nome}
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <div className="mb-1 text-xs font-medium text-text-secondary">SLIDES DA AULA</div>
+                  <ListaMateriais materiais={g.itens.filter((m) => m.papel === "slides")} podeApagar={podeApagarAula} detalhe={detalheAula} />
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-medium text-text-secondary">MATERIAIS DE APOIO</div>
+                  <ListaMateriais materiais={g.itens.filter((m) => m.papel !== "slides")} podeApagar={podeApagarAula} detalhe={detalheAula} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
         {(ehCoord || ehProf) && (
           <UploadBiblioteca categoria="aula" pessoaId={sessao.pessoaId} turmas={turmasSimples} turmaPadrao={turmaFiltro?.id} />
         )}

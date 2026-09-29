@@ -151,8 +151,21 @@ export async function enviarMaterialDeAula(
       };
     }
 
+    const ext = extensao(arquivo.name);
+    const { data: aulaInfo } = await supabase
+      .from("aulas")
+      .select("modulo_id")
+      .eq("id", aulaId)
+      .maybeSingle();
+    const { data: moduloInfo } = aulaInfo
+      ? await supabase.from("modulos").select("turma_id").eq("id", aulaInfo.modulo_id).maybeSingle()
+      : { data: null };
+
     const { error: erroInsert } = await supabase.from("materiais").insert({
       origem: "de_aula",
+      categoria: "aula",
+      turma_id: moduloInfo?.turma_id ?? null,
+      papel: ext === "pptx" || ext === "ppt" ? "slides" : "apoio",
       aula_id: aulaId,
       enviado_por: sessao.pessoaId,
       titulo,
@@ -224,6 +237,7 @@ export async function registrarMaterial(entrada: {
   tipo: string;
   caminho: string;
   turmaId?: string | null;
+  papel?: string | null;
 }): Promise<EstadoForm> {
   let sessao;
   try {
@@ -239,6 +253,21 @@ export async function registrarMaterial(entrada: {
   }
   if (!titulo.trim()) return { erro: "Informe o título." };
 
+  let papel: "slides" | "apoio" | null = null;
+  if (categoria === "aula") {
+    if (!entrada.turmaId) return { erro: "Escolha a turma da aula." };
+    if (entrada.papel !== "slides" && entrada.papel !== "apoio") {
+      return { erro: "Diga se é slide da aula ou material de apoio." };
+    }
+    papel = entrada.papel;
+    if (sessao.role === "professor") {
+      const { data: minhas } = await createClient().rpc("minhas_turmas");
+      if (!((minhas ?? []) as unknown as string[]).includes(entrada.turmaId)) {
+        return { erro: "Você só publica aulas nas turmas em que está escalado." };
+      }
+    }
+  }
+
   const pasta = categoria === "livro" ? "livros" : categoria === "institucional" ? "institucional" : "aulas";
   if (!caminho.startsWith(`${pasta}/`) || caminho.includes("..")) return { erro: "Caminho inválido." };
 
@@ -247,6 +276,7 @@ export async function registrarMaterial(entrada: {
     origem: categoria === "aula" ? "de_aula" : "oficial",
     categoria: categoria as "livro" | "institucional" | "aula",
     turma_id: entrada.turmaId || null,
+    papel,
     enviado_por: sessao.pessoaId,
     titulo: titulo.trim(),
     tipo_arquivo: tipo,
