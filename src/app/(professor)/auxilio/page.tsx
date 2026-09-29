@@ -26,7 +26,9 @@ export default async function AuxilioProfessorPage({
   const supabase = createClient();
 
   const todasTurmas = await listarTurmas();
-  const minhas = souCoordenacao ? null : await listarMinhasTurmasIds();
+  // coordenação que também dá aula vê as próprias turmas; sem vínculo, vê todas
+  const meusIds = await listarMinhasTurmasIds();
+  const minhas = souCoordenacao && meusIds.length === 0 ? null : meusIds;
   const turmas = todasTurmas.filter((t) => minhas === null || minhas.includes(t.id));
 
   // ---- Conversa livre (rascunhos sem aula) -------------------------------

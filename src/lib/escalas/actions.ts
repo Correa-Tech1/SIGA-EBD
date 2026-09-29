@@ -42,7 +42,7 @@ export async function criarEscala(
     .from("pessoas")
     .select("id")
     .eq("id", pessoaId)
-    .eq("role", "professor")
+    .or("role.eq.professor,professor_tipo.not.is.null")
     .maybeSingle();
   if (!professor) return { erro: "Só professores cadastrados na aba Professores podem ser escalados." };
 

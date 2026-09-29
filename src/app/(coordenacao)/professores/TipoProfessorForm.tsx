@@ -18,17 +18,25 @@ function Botao() {
   );
 }
 
-export function TipoProfessorForm({ pessoaId, tipo }: { pessoaId: string; tipo: "regular" | "convidado" }) {
+export function TipoProfessorForm({
+  pessoaId,
+  tipo,
+  permitirNenhum = false,
+}: {
+  pessoaId: string;
+  tipo: "regular" | "convidado" | "nenhum";
+  permitirNenhum?: boolean;
+}) {
   const [estado, acao] = useFormState(atualizarTipoProfessor, estadoInicial);
   return (
     <form action={acao}>
       <input type="hidden" name="pessoaId" value={pessoaId} />
       <div className="mb-2 text-xs text-text-secondary">TIPO</div>
       <div className="mb-3 flex gap-4">
-        {(["regular", "convidado"] as const).map((t) => (
+        {((permitirNenhum ? ["nenhum", "regular", "convidado"] : ["regular", "convidado"]) as ("nenhum" | "regular" | "convidado")[]).map((t) => (
           <label key={t} className="flex items-center gap-2 text-sm">
             <input type="radio" name="professorTipo" value={t} defaultChecked={tipo === t} className="h-4 w-4 accent-primary" />
-            {t === "regular" ? "Regular" : "Convidado"}
+            {t === "regular" ? "Regular" : t === "convidado" ? "Convidado" : "Não dá aula"}
           </label>
         ))}
       </div>

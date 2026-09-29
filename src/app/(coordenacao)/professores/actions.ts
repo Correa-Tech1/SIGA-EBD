@@ -216,9 +216,16 @@ export async function atualizarTipoProfessor(
     return { erro: "Ação restrita à coordenação." };
   }
   const pessoaId = String(formData.get("pessoaId") ?? "");
-  const tipo = String(formData.get("professorTipo") ?? "") === "convidado" ? "convidado" : "regular";
+  const bruto = String(formData.get("professorTipo") ?? "");
   if (!pessoaId) return { erro: "Professor inválido." };
   const supabase = createClient();
+  // "nenhum" só vale para quem é coordenação (deixa de aparecer na escala como professor)
+  let tipo: "regular" | "convidado" | null = bruto === "convidado" ? "convidado" : "regular";
+  if (bruto === "nenhum") {
+    const { data: alvo } = await supabase.from("pessoas").select("role").eq("id", pessoaId).maybeSingle();
+    if (alvo?.role !== "coordenacao") return { erro: "Professor cadastrado não pode ficar sem tipo." };
+    tipo = null;
+  }
   const { error } = await supabase.from("pessoas").update({ professor_tipo: tipo }).eq("id", pessoaId);
   if (error) return { erro: `Falha ao salvar: ${error.message}` };
   revalidatePath("/professores");

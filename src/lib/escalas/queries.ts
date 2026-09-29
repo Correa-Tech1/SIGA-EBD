@@ -41,7 +41,7 @@ export interface ProfessorOpcao {
 export async function listarProfessoresParaEscala(turmaId: string): Promise<ProfessorOpcao[]> {
   const supabase = createClient();
   const [{ data: professores }, { data: vinculos }] = await Promise.all([
-    supabase.from("pessoas").select("id, nome, professor_tipo").eq("role", "professor").order("nome"),
+    supabase.from("pessoas").select("id, nome, professor_tipo").or("role.eq.professor,professor_tipo.not.is.null").order("nome"),
     supabase.from("professor_turmas").select("pessoa_id").eq("turma_id", turmaId),
   ]);
   const daTurma = new Set((vinculos ?? []).map((v) => v.pessoa_id));

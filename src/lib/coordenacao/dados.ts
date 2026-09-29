@@ -36,7 +36,7 @@ export async function carregarProfessores(hoje: string, proximoDomingo: string) 
   const ano = hoje.slice(0, 4);
   const [turmas, { data: professores }, { data: escalas }, { data: vinculos }, prep] = await Promise.all([
     listarTurmas(),
-    supabase.from("pessoas").select("id, nome, auth_user_id, professor_tipo").eq("role", "professor").order("nome"),
+    supabase.from("pessoas").select("id, nome, auth_user_id, professor_tipo").or("role.eq.professor,professor_tipo.not.is.null").order("nome"),
     supabase.from("escalas").select("pessoa_id, turma_id, data").gte("data", `${ano}-01-01`).lte("data", `${ano}-12-31`),
     supabase.from("professor_turmas").select("pessoa_id, turma_id"),
     supabase

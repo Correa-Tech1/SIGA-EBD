@@ -26,6 +26,12 @@ export default async function ProfessoresPage() {
     listarTurmas(),
     supabase.from("professor_turmas").select("pessoa_id, turma_id"),
   ]);
+  // coordenação também pode dar aula (sem segunda conta): basta marcar tipo e turma
+  const { data: coordenadores } = await supabase
+    .from("pessoas")
+    .select("id, nome, professor_tipo")
+    .eq("role", "coordenacao")
+    .order("nome");
 
   const turmasPorPessoa = new Map<string, Set<string>>();
   for (const e of vinculos ?? []) {
@@ -58,6 +64,38 @@ export default async function ProfessoresPage() {
       <div className="mb-6">
         <NovoProfessorForm turmas={turmasSimples} />
       </div>
+
+      {(coordenadores ?? []).length > 0 && (
+        <div className="mb-6 space-y-3">
+          <div>
+            <h2 className="font-display text-base font-semibold text-primary">Coordenação que também dá aula</h2>
+            <p className="mt-1 text-xs text-text-secondary">
+              Sem criar outra conta: marque o tipo e a turma, e o nome passa a aparecer na escala e nos números de professores.
+            </p>
+          </div>
+          {(coordenadores ?? []).map((c) => {
+            const marcadas = [...(turmasPorPessoa.get(c.id) ?? [])];
+            const tipo = c.professor_tipo === "convidado" ? "convidado" : c.professor_tipo === "regular" ? "regular" : "nenhum";
+            return (
+              <div key={c.id} className="rounded-xl border border-border bg-surface px-6 py-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+                  {c.nome}
+                  <span className="rounded-full bg-border-light px-2 py-0.5 text-xs text-text-secondary">Coordenação</span>
+                  {tipo !== "nenhum" && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                      Dá aula · {tipo === "regular" ? "Regular" : "Convidado"}
+                    </span>
+                  )}
+                </div>
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <TipoProfessorForm pessoaId={c.id} tipo={tipo} permitirNenhum />
+                  <TurmasProfessorForm pessoaId={c.id} turmas={turmasSimples} marcadas={marcadas} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="space-y-3">
         {(professores ?? []).length === 0 && (
