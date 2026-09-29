@@ -49,6 +49,8 @@ export async function criarAula(
 
   revalidatePath("/frequencia");
   revalidatePath("/minha-turma");
+  revalidatePath("/dashboard");
+  revalidatePath("/frequencia/relatorio");
 
   // Formulário "Lançar novo domingo": cai direto na chamada da data criada.
   const voltarPara = String(formData.get("voltarPara") ?? "");
@@ -102,6 +104,8 @@ export async function lancarPresencas(
 
   revalidatePath("/frequencia");
   revalidatePath("/minha-turma");
+  revalidatePath("/dashboard");
+  revalidatePath("/frequencia/relatorio");
   return { sucesso: "Presença lançada." };
 }
 
@@ -137,6 +141,8 @@ export async function matricularExistente(
 
   revalidatePath("/frequencia");
   revalidatePath("/minha-turma");
+  revalidatePath("/dashboard");
+  revalidatePath("/frequencia/relatorio");
   return { sucesso: "Pessoa matriculada." };
 }
 
@@ -179,6 +185,8 @@ export async function matricularNovaPessoa(
 
   revalidatePath("/frequencia");
   revalidatePath("/minha-turma");
+  revalidatePath("/dashboard");
+  revalidatePath("/frequencia/relatorio");
   return { sucesso: `${nome} cadastrado(a) e matriculado(a).` };
 }
 
@@ -209,5 +217,7 @@ export async function desmatricular(
 
   revalidatePath("/frequencia");
   revalidatePath("/minha-turma");
+  revalidatePath("/dashboard");
+  revalidatePath("/frequencia/relatorio");
   return { sucesso: "Matrícula removida." };
 }

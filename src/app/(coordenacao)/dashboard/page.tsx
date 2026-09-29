@@ -77,7 +77,7 @@ export default async function DashboardPage() {
             />
             <KpiColorido
               fundo="#101E24"
-              rotulo="Adultos da igreja na EBD"
+              rotulo="Membros adultos que passaram pela EBD"
               valor={fmtPct(pctAdultos)}
               detalhe={`${r.igreja.passaram} de ${r.igreja.adultos} adultos · ${r.aulas} domingos`}
             />

@@ -248,10 +248,10 @@ export async function PainelFrequencia({
       {podeGerenciarMatricula && (
         <div className="rounded-xl border border-border bg-surface p-5">
           <div className="font-display text-base font-semibold text-primary">
-            Matrícula da turma
+            Irmãos que passaram pela EBD
           </div>
           <p className="mb-4 mt-1 text-xs text-text-secondary">
-            Só a coordenação adiciona ou remove pessoas da turma.
+            Quem já frequentou esta turma. É essa lista que aparece na chamada; só a coordenação adiciona ou remove.
           </p>
 
           {roster.length > 0 && (

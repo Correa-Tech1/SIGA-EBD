@@ -131,7 +131,7 @@ export function FormularioPresenca({
   if (roster.length === 0) {
     return (
       <p className="rounded-lg bg-bg p-4 text-sm text-text-secondary">
-        Ninguém matriculado nesta turma ainda — matricule alguém na seção abaixo antes de lançar
+        Nenhum irmão registrado nesta turma ainda — adicione alguém na seção “Irmãos que passaram pela EBD” abaixo antes de lançar
         presença.
       </p>
     );
@@ -193,7 +193,7 @@ export function FormularioMatricularExistente({
           ))}
         </select>
       </div>
-      <Botao texto="Matricular" textoCarregando="Matriculando…" />
+      <Botao texto="Adicionar" textoCarregando="Adicionando…" />
       <Mensagens estado={estado} />
     </form>
   );
@@ -212,7 +212,7 @@ export function FormularioMatricularNovo({ turmaId }: { turmaId: string }) {
         <label className="mb-1 block text-xs text-text-secondary">TELEFONE (opcional)</label>
         <input name="telefone" className="w-full rounded-lg border border-border px-3 py-2 text-sm" />
       </div>
-      <Botao texto="Cadastrar e matricular" textoCarregando="Salvando…" />
+      <Botao texto="Cadastrar e adicionar" textoCarregando="Salvando…" />
       <Mensagens estado={estado} />
     </form>
   );
