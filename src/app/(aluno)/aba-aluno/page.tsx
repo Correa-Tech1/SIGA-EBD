@@ -25,6 +25,9 @@ export default async function AbaAlunoPage({
       <p className="mt-2 text-sm text-text-secondary">
         Materiais, avisos e seu histórico de presença — sem precisar de login.
       </p>
+      <a href="/biblioteca" className="mt-2 inline-block text-sm font-medium text-primary hover:underline">
+        Abrir a Biblioteca (livros, materiais e aulas) →
+      </a>
 
       <MeuHistorico
         pessoas={pessoas}

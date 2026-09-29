@@ -16,7 +16,7 @@ export interface EstadoForm {
 }
 
 const TIPOS_ACEITOS = new Set(["pdf", "docx", "pptx", "doc", "ppt", "mp3", "mp4", "jpg", "jpeg", "png"]);
-const TAMANHO_MAX_BYTES = 25 * 1024 * 1024; // 25MB — suficiente pra slide/estudo, sem deixar o bucket disparar de custo.
+const TAMANHO_MAX_BYTES = 25 * 1024 * 1024; // 25MB (upload pelo servidor) — suficiente pra slide/estudo, sem deixar o bucket disparar de custo.
 
 function extensao(nomeArquivo: string): string {
   return (nomeArquivo.split(".").pop() ?? "").toLowerCase();
@@ -212,4 +212,52 @@ export async function apagarMaterial(
   revalidatePath("/frequencia");
   revalidatePath("/aba-aluno");
   return { sucesso: "Material removido." };
+}
+
+// Registro de um arquivo que o NAVEGADOR já enviou direto ao Storage (upload
+// direto evita o limite de ~4,5 MB de corpo das funções da Vercel — livros
+// em PDF passam disso fácil). As policies do Storage já decidiram se o
+// upload podia acontecer; aqui a tabela `materiais` confere o mesmo caminho.
+export async function registrarMaterial(entrada: {
+  categoria: string;
+  titulo: string;
+  tipo: string;
+  caminho: string;
+  turmaId?: string | null;
+}): Promise<EstadoForm> {
+  let sessao;
+  try {
+    sessao = await exigirProfessorOuCoordenacao();
+  } catch {
+    return { erro: "Ação restrita a professores e coordenação." };
+  }
+
+  const { categoria, titulo, tipo, caminho } = entrada;
+  if (!["livro", "institucional", "aula"].includes(categoria)) return { erro: "Categoria inválida." };
+  if (categoria !== "aula" && sessao.role !== "coordenacao") {
+    return { erro: "Livros e materiais institucionais são publicados pela coordenação." };
+  }
+  if (!titulo.trim()) return { erro: "Informe o título." };
+
+  const pasta = categoria === "livro" ? "livros" : categoria === "institucional" ? "institucional" : "aulas";
+  if (!caminho.startsWith(`${pasta}/`) || caminho.includes("..")) return { erro: "Caminho inválido." };
+
+  const supabase = createClient();
+  const { error } = await supabase.from("materiais").insert({
+    origem: categoria === "aula" ? "de_aula" : "oficial",
+    categoria: categoria as "livro" | "institucional" | "aula",
+    turma_id: entrada.turmaId || null,
+    enviado_por: sessao.pessoaId,
+    titulo: titulo.trim(),
+    tipo_arquivo: tipo,
+    caminho_arquivo: caminho,
+  });
+  if (error) {
+    await supabase.storage.from("materiais").remove([caminho]);
+    return { erro: `Falha ao registrar: ${error.message}` };
+  }
+
+  revalidatePath("/biblioteca");
+  revalidatePath("/aba-aluno");
+  return { sucesso: "Publicado." };
 }

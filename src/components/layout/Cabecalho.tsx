@@ -51,6 +51,11 @@ export function Cabecalho({
         })}
       </nav>
 
+      {!nome ? (
+        <a href="/login" className="rounded-lg border border-white/40 px-4 py-1.5 text-sm text-white hover:bg-white/10">
+          Entrar
+        </a>
+      ) : (
       <a
         href="/conta"
         title="Minha conta: trocar senha e sair"
@@ -66,6 +71,7 @@ export function Cabecalho({
           {nome} <span className="text-white/60">· {papel}</span>
         </span>
       </a>
+      )}
     </header>
   );
 }

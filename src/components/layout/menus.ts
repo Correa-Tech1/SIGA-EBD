@@ -20,3 +20,9 @@ export const MENU_PROFESSOR: ItemMenu[] = [
   { href: "/biblioteca", rotulo: "BIBLIOTECA" },
   { href: "/auxilio", rotulo: "AUXÍLIO AO PROFESSOR" },
 ];
+
+// Quem não fez login (aluno): só leitura.
+export const MENU_ALUNO: ItemMenu[] = [
+  { href: "/aba-aluno", rotulo: "ABA DO ALUNO" },
+  { href: "/biblioteca", rotulo: "BIBLIOTECA" },
+];

@@ -21,6 +21,7 @@ const ICONE_POR_TIPO: Record<string, string> = {
 export function ListaMateriais({
   materiais,
   podeApagar,
+  detalhe,
 }: {
   materiais: Material[];
   // Booleano simples (tudo ou nada) ou uma função pra decidir por material —
@@ -28,6 +29,8 @@ export function ListaMateriais({
   // coordenação pode apagar qualquer um (mesma regra do RLS, só que também
   // refletida na UI pra não mostrar um botão que o banco recusaria).
   podeApagar: boolean | ((material: Material) => boolean);
+  // linha pequena sob o título (ex.: “Homens · por Fulano · 12/09”)
+  detalhe?: (material: Material) => string;
 }) {
   if (materiais.length === 0) {
     return <p className="text-sm text-text-secondary">Nenhum material aqui ainda.</p>;
@@ -51,7 +54,12 @@ export function ListaMateriais({
               className="flex items-center gap-2 text-sm text-primary hover:underline"
             >
               <span>{ICONE_POR_TIPO[material.tipo_arquivo] ?? "📎"}</span>
-              {material.titulo}
+              <span>
+                {material.titulo}
+                {detalhe && (
+                  <span className="block text-xs font-normal text-text-secondary">{detalhe(material)}</span>
+                )}
+              </span>
             </a>
             {apagavel && <BotaoApagarMaterial materialId={material.id} />}
           </div>
