@@ -154,6 +154,21 @@ export interface Database {
         },
         "pessoa_id" | "titulo"
       >;
+      preparos: Tabela<
+        {
+          id: string;
+          pessoa_id: string;
+          turma_id: string;
+          data: string;
+          titulo: string;
+          rascunho_id: string | null;
+          etapas_prontas: number;
+          etapas_total: number;
+          slides_gerados: boolean;
+          atualizado_em: string;
+        },
+        "pessoa_id" | "turma_id" | "data" | "titulo"
+      >;
       matriculas: Tabela<
         {
           id: string;

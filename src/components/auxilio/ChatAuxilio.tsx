@@ -6,7 +6,7 @@
 // endpoint /api/auxilio; a conversa inteira (pergunta + resposta) já fica
 // salva em `rascunhos.conteudo` do lado do servidor a cada troca, então
 // recarregar a página nunca perde o histórico.
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ArquivosGerados } from "./ArquivosGerados";
 
@@ -30,7 +30,18 @@ export function ChatAuxilio({
   pessoaId,
   turmas,
   historicoInicial,
+  pedido,
+  etapasOpcoes,
+  aoUsarNaEtapa,
+  compacto,
+  aoGerarArquivos,
 }: {
+  aoGerarArquivos?: (arquivos: Anexo[]) => void;
+  // pedido: texto enviado pela Mesa (atalhos); o id muda a cada clique
+  pedido?: { id: number; texto: string } | null;
+  etapasOpcoes?: { chave: string; nome: string }[];
+  aoUsarNaEtapa?: (chave: string, texto: string) => void;
+  compacto?: boolean;
   turmas: { id: string; nome: string }[];
   rascunhoId: string;
   pessoaId: string;
@@ -73,16 +84,25 @@ export function ChatAuxilio({
     if (inputArquivo.current) inputArquivo.current.value = "";
   }
 
-  async function enviar(evento?: FormEvent) {
+  const ultimoPedido = useRef<number>(0);
+  useEffect(() => {
+    if (pedido && pedido.id !== ultimoPedido.current && !enviando) {
+      ultimoPedido.current = pedido.id;
+      void enviar(undefined, pedido.texto);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedido]);
+
+  async function enviar(evento?: FormEvent, textoDireto?: string) {
     evento?.preventDefault();
-    const mensagem = rascunhoTexto.trim();
+    const mensagem = (textoDireto ?? rascunhoTexto).trim();
     if (!mensagem || enviando || subindo) return;
     const anexosEnvio = anexos;
 
     setErro(null);
     setEnviando(true);
     setMensagens((atual) => [...atual, { role: "user", texto: mensagem, anexos: anexosEnvio }]);
-    setRascunhoTexto("");
+    if (textoDireto === undefined) setRascunhoTexto("");
     setAnexos([]);
 
     try {
@@ -99,7 +119,9 @@ export function ChatAuxilio({
         return;
       }
 
-      setMensagens((atual) => [...atual, { role: "assistant", texto: dados.resposta as string, arquivos: (dados.arquivos as Anexo[]) ?? [] }]);
+      const gerados = (dados.arquivos as Anexo[]) ?? [];
+      setMensagens((atual) => [...atual, { role: "assistant", texto: dados.resposta as string, arquivos: gerados }]);
+      if (gerados.length) aoGerarArquivos?.(gerados);
     } catch {
       setErro("Falha de conexão. Tente de novo.");
       setMensagens((atual) => atual.slice(0, -1));
@@ -116,7 +138,7 @@ export function ChatAuxilio({
   }
 
   return (
-    <div className="flex h-[560px] flex-col rounded-xl border border-border bg-surface">
+    <div className={`flex flex-col rounded-xl border border-border bg-surface ${compacto ? "h-full min-h-0" : "h-[560px]"}`}>
       <div className="flex-1 space-y-3 overflow-y-auto p-5">
         {mensagens.length === 0 && (
           <p className="text-sm text-text-secondary">
@@ -135,13 +157,16 @@ export function ChatAuxilio({
               <div className="mb-2 flex flex-wrap gap-1.5">
                 {m.anexos.map((a) => (
                   <span key={a.caminho} className="rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                    📎 {a.nome}
+                    Anexo: {a.nome}
                   </span>
                 ))}
               </div>
             )}
             {m.texto}
             {m.arquivos && m.arquivos.length > 0 && <ArquivosGerados arquivos={m.arquivos} turmas={turmas} />}
+            {m.role === "assistant" && aoUsarNaEtapa && etapasOpcoes && (
+              <UsarNaEtapa opcoes={etapasOpcoes} aoUsar={(chave) => aoUsarNaEtapa(chave, m.texto)} />
+            )}
           </div>
         ))}
         {enviando && <div className="text-xs text-text-secondary">Pensando…</div>}
@@ -157,7 +182,7 @@ export function ChatAuxilio({
         <div className="flex flex-wrap gap-1.5 border-t border-border-light px-4 pt-3">
           {anexos.map((a) => (
             <span key={a.caminho} className="flex items-center gap-1 rounded-full bg-bg px-2.5 py-1 text-xs">
-              📎 {a.nome}
+              {a.nome}
               <button
                 type="button"
                 aria-label={`Remover ${a.nome}`}
@@ -185,9 +210,9 @@ export function ChatAuxilio({
           onClick={() => inputArquivo.current?.click()}
           disabled={subindo || anexos.length >= 5}
           title="Anexar PDF, DOCX, PPTX ou imagem"
-          className="rounded-lg border border-border px-3 text-lg disabled:opacity-50"
+          className="rounded-lg border border-border px-3 text-sm text-primary disabled:opacity-50"
         >
-          {subindo ? "…" : "📎"}
+          {subindo ? "…" : "Anexar"}
         </button>
         <textarea
           value={rascunhoTexto}
@@ -205,6 +230,29 @@ export function ChatAuxilio({
           Enviar
         </button>
       </form>
+    </div>
+  );
+}
+
+function UsarNaEtapa({ opcoes, aoUsar }: { opcoes: { chave: string; nome: string }[]; aoUsar: (chave: string) => void }) {
+  return (
+    <div className="mt-2 border-t border-border-light pt-2">
+      <select
+        aria-label="Usar esta resposta em uma etapa do roteiro"
+        defaultValue=""
+        onChange={(e) => {
+          if (e.target.value) aoUsar(e.target.value);
+          e.target.value = "";
+        }}
+        className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-primary"
+      >
+        <option value="">Usar na etapa…</option>
+        {opcoes.map((o) => (
+          <option key={o.chave} value={o.chave}>
+            {o.nome}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

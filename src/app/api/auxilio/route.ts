@@ -16,6 +16,7 @@ import { METODO_SISTEMA } from "@/lib/auxilio/metodologia";
 import { montarContextoConteudo } from "@/lib/auxilio/contexto";
 import type { Mensagem, AnexoMensagem } from "@/lib/auxilio/queries";
 import { blocosDoArquivo, type BlocoArquivo } from "@/lib/auxilio/arquivos";
+import { textoRoteiro, type EstadoEtapas } from "@/lib/auxilio/mesa";
 import { FERRAMENTAS, executarFerramenta, type ArquivoGerado } from "@/lib/auxilio/ferramentas";
 
 const MODELO_FIXO = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
@@ -88,7 +89,16 @@ export async function POST(request: NextRequest) {
   }
 
   const historicoAnterior = ((rascunho.conteudo as { historico?: Mensagem[] } | null)?.historico ?? []);
-  const contexto = await montarContextoConteudo(rascunho.aula_id, rascunho.modulo_id);
+  const etapasSalvas = ((rascunho.conteudo as { etapas?: EstadoEtapas } | null)?.etapas ?? null) as EstadoEtapas | null;
+  const { data: preparo } = await supabase
+    .from("preparos")
+    .select("id, titulo, data")
+    .eq("rascunho_id", rascunhoId)
+    .maybeSingle();
+  const contextoBase = await montarContextoConteudo(rascunho.aula_id, rascunho.modulo_id);
+  const contexto = preparo
+    ? `${contextoBase}\nAula em preparo: "${preparo.titulo}" (domingo ${preparo.data})\n\nROTEIRO ATUAL DO PROFESSOR (o que ele já escreveu; trate como a base da conversa e não peça de novo o que já está aqui):\n${textoRoteiro(etapasSalvas ?? {})}`
+    : contextoBase;
 
   const anthropic = new Anthropic({ apiKey: chaveApi });
 
@@ -198,8 +208,12 @@ ${contexto}`;
 
   await supabase
     .from("rascunhos")
-    .update({ conteudo: { historico: novoHistorico }, titulo: tituloNovo })
+    .update({ conteudo: { ...((rascunho.conteudo as Record<string, unknown> | null) ?? {}), historico: novoHistorico }, titulo: tituloNovo })
     .eq("id", rascunhoId);
+
+  if (preparo && ctxFerramentas.gerados.length) {
+    await supabase.from("preparos").update({ slides_gerados: true }).eq("id", preparo.id);
+  }
 
   return NextResponse.json({ resposta: textoResposta, arquivos: ctxFerramentas.gerados });
 }

@@ -2,11 +2,10 @@
 
 Aguardando o Matheus rodar no Supabase (ele avisa quando fizer).
 
-Arquivo único: `PENDENTES.sql` = migrações 0007 + 0008 + 0009 (Biblioteca em 3 prateleiras,
-bucket privado dos anexos do Auxílio, aulas por turma e slides × apoio).
+Arquivo único: `PENDENTES.sql` = migração 0010 (Mesa de Preparo: tabela `preparos`, só andamento;
+o conteúdo continua privado em `rascunhos`).
 
-Enquanto não rodar: Biblioteca, materiais em Minha Turma / Aba do Aluno e o Auxílio com anexos
-ficam vazios ou com erro (as telas já esperam as colunas novas).
+Enquanto não rodar: a Mesa mostra aviso de "falta rodar o SQL" e a prontidão de domingo fica oculta.
 
 Regra combinada: novas migrações entram no `PENDENTES.sql` (acrescentar ao final) até o aviso;
 depois do aviso, esvaziar esta pasta.
