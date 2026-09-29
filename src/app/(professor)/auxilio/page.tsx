@@ -63,6 +63,7 @@ export default async function AuxilioProfessorPage({
           <ChatAuxilio
             key={rascunhoAtual.id}
             rascunhoId={rascunhoAtual.id}
+            pessoaId={sessao.pessoaId ?? ""}
             historicoInicial={rascunhoAtual.conteudo?.historico ?? []}
           />
         ) : (

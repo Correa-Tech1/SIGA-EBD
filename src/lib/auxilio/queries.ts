@@ -3,9 +3,15 @@ import { listarMinhasTurmasIds } from "@/lib/frequencia/queries";
 import { listarModulos, listarTurmas } from "@/lib/estrutura/queries";
 import { listarAulasDosModulos } from "@/lib/frequencia/queries";
 
+export interface AnexoMensagem {
+  nome: string;
+  caminho: string; // no bucket privado 'auxilio'
+}
+
 export interface Mensagem {
   role: "user" | "assistant";
   texto: string;
+  anexos?: AnexoMensagem[];
 }
 
 export interface RascunhoResumo {

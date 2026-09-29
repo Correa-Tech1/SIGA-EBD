@@ -14,10 +14,17 @@ import { exigirProfessorOuCoordenacao } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { METODO_SISTEMA } from "@/lib/auxilio/metodologia";
 import { montarContextoConteudo } from "@/lib/auxilio/contexto";
-import type { Mensagem } from "@/lib/auxilio/queries";
+import type { Mensagem, AnexoMensagem } from "@/lib/auxilio/queries";
+import { blocosDoArquivo, type BlocoArquivo } from "@/lib/auxilio/arquivos";
+import { FERRAMENTAS, executarFerramenta } from "@/lib/auxilio/ferramentas";
 
 const MODELO_FIXO = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
-const MAX_TOKENS_FIXO = 1500;
+const MAX_TOKENS_FIXO = 4000;
+const MAX_RODADAS_FERRAMENTA = 6;
+const MAX_ANEXOS_NA_CONVERSA = 5;
+
+// A leitura de arquivos e a Biblioteca podem levar dezenas de segundos.
+export const maxDuration = 60;
 const TAMANHO_MAX_MENSAGEM = 4000;
 
 export async function POST(request: NextRequest) {
@@ -27,7 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: "Ação restrita a professores e coordenação." }, { status: 403 });
   }
 
-  let corpo: { rascunhoId?: unknown; mensagem?: unknown };
+  let corpo: { rascunhoId?: unknown; mensagem?: unknown; anexos?: unknown };
   try {
     corpo = await request.json();
   } catch {
@@ -40,6 +47,15 @@ export async function POST(request: NextRequest) {
   if (!rascunhoId || !mensagem) {
     return NextResponse.json({ erro: "Informe o rascunho e a mensagem." }, { status: 400 });
   }
+  // anexos: só nome + caminho no bucket privado do próprio usuário
+  const anexosNovos: AnexoMensagem[] = Array.isArray(corpo.anexos)
+    ? (corpo.anexos as unknown[])
+        .filter(
+          (a): a is AnexoMensagem =>
+            !!a && typeof (a as AnexoMensagem).nome === "string" && typeof (a as AnexoMensagem).caminho === "string"
+        )
+        .slice(0, MAX_ANEXOS_NA_CONVERSA)
+    : [];
   if (mensagem.length > TAMANHO_MAX_MENSAGEM) {
     return NextResponse.json(
       { erro: `Mensagem muito longa (máximo ${TAMANHO_MAX_MENSAGEM} caracteres).` },
@@ -76,30 +92,91 @@ export async function POST(request: NextRequest) {
 
   const anthropic = new Anthropic({ apiKey: chaveApi });
 
-  let resposta;
+  // Arquivos (do bucket privado do usuário) -> blocos de conteúdo. A RLS do
+  // Storage só entrega o que está na pasta da própria pessoa.
+  async function blocosDosAnexos(anexos: AnexoMensagem[]): Promise<BlocoArquivo[]> {
+    const blocos: BlocoArquivo[] = [];
+    for (const anexo of anexos) {
+      const { data: blob, error } = await supabase.storage.from("auxilio").download(anexo.caminho);
+      if (error || !blob) {
+        blocos.push({ type: "text", text: `(não consegui abrir o anexo "${anexo.nome}")` });
+        continue;
+      }
+      try {
+        blocos.push(...(await blocosDoArquivo(anexo.nome, new Uint8Array(await blob.arrayBuffer()))));
+      } catch (e) {
+        blocos.push({ type: "text", text: `(anexo "${anexo.nome}" ignorado: ${e instanceof Error ? e.message : "erro"})` });
+      }
+    }
+    return blocos;
+  }
+
+  // Reenvia os anexos das mensagens anteriores (os mais recentes) para o modelo não "esquecer" o arquivo.
+  let restante = MAX_ANEXOS_NA_CONVERSA - anexosNovos.length;
+  const mensagensApi: Anthropic.MessageParam[] = [];
+  for (let i = historicoAnterior.length - 1; i >= 0; i--) {
+    const m = historicoAnterior[i];
+    let conteudo: Anthropic.MessageParam["content"] = m.texto;
+    if (m.role === "user" && m.anexos?.length && restante > 0) {
+      const usar = m.anexos.slice(0, restante);
+      restante -= usar.length;
+      conteudo = [...(await blocosDosAnexos(usar)), { type: "text", text: m.texto }];
+    }
+    mensagensApi.unshift({ role: m.role, content: conteudo });
+  }
+  mensagensApi.push({
+    role: "user",
+    content: [...(await blocosDosAnexos(anexosNovos)), { type: "text", text: mensagem }],
+  });
+
+  const sistema = `${METODO_SISTEMA}
+
+---
+CAPACIDADES NESTA CONVERSA:
+- O professor pode anexar PDF, DOCX, PPTX e imagens; você os recebe no corpo da mensagem.
+- Você tem acesso à Biblioteca da EBD (livros, materiais institucionais e aulas de outros professores) pelas ferramentas listar_biblioteca e ler_material. Consulte-a quando ajudar (ex.: o livro-base do módulo) e cite o título do material que usou. Não invente o que não leu.
+- Nesta fase você ainda NÃO gera arquivos para download: entregue o roteiro/aula pronto em texto organizado (títulos, passos, perguntas), que o professor copia para o material dele.
+
+---
+CONTEÚDO DO SEMESTRE (esta aula/rascunho específico):
+${contexto}`;
+
+  let resposta: Anthropic.Message;
   try {
-    resposta = await anthropic.messages.create({
-      model: MODELO_FIXO,
-      max_tokens: MAX_TOKENS_FIXO,
-      system: `${METODO_SISTEMA}\n\n---\nCONTEÚDO DO SEMESTRE (esta aula/rascunho específico):\n${contexto}`,
-      messages: [
-        ...historicoAnterior.map((m) => ({ role: m.role, content: m.texto })),
-        { role: "user" as const, content: mensagem },
-      ],
-    });
+    let rodada = 0;
+    for (;;) {
+      resposta = await anthropic.messages.create({
+        model: MODELO_FIXO,
+        max_tokens: MAX_TOKENS_FIXO,
+        system: sistema,
+        tools: FERRAMENTAS,
+        messages: mensagensApi,
+      });
+      if (resposta.stop_reason !== "tool_use" || rodada >= MAX_RODADAS_FERRAMENTA) break;
+      rodada += 1;
+      mensagensApi.push({ role: "assistant", content: resposta.content });
+      const resultados: Anthropic.ToolResultBlockParam[] = [];
+      for (const bloco of resposta.content) {
+        if (bloco.type !== "tool_use") continue;
+        const saida = await executarFerramenta(bloco.name, (bloco.input ?? {}) as Record<string, unknown>);
+        resultados.push({ type: "tool_result", tool_use_id: bloco.id, content: saida });
+      }
+      mensagensApi.push({ role: "user", content: resultados });
+    }
   } catch (erroIA) {
     const detalhe = erroIA instanceof Error ? erroIA.message : "erro desconhecido";
     return NextResponse.json({ erro: `Falha ao consultar a IA: ${detalhe}` }, { status: 502 });
   }
 
-  const textoResposta = resposta.content
-    .map((bloco) => (bloco.type === "text" ? bloco.text : ""))
-    .join("\n")
-    .trim();
+  const textoResposta =
+    resposta.content
+      .map((bloco) => (bloco.type === "text" ? bloco.text : ""))
+      .join("\n")
+      .trim() || "Não consegui concluir a resposta (muitas consultas à Biblioteca). Pode reformular ou ser mais específico?";
 
   const novoHistorico: Mensagem[] = [
     ...historicoAnterior,
-    { role: "user", texto: mensagem },
+    { role: "user", texto: mensagem, ...(anexosNovos.length ? { anexos: anexosNovos } : {}) },
     { role: "assistant", texto: textoResposta },
   ];
 
