@@ -53,6 +53,7 @@ export function ArquivosGerados({
                 {turmas.map((t) => (
                   <option key={t.id} value={t.id}>{t.nome}</option>
                 ))}
+                <option value="unificada">Unificada (Homens + Mulheres)</option>
               </select>
               <button type="button" disabled={ocupado === a.caminho} onClick={() => void publicar(a)} className="rounded-lg border border-border px-3 py-1 text-primary disabled:opacity-60">
                 {ocupado === a.caminho ? "Publicando…" : "Publicar"}

@@ -75,6 +75,7 @@ export function UploadBiblioteca({
             {turmas.map((t) => (
               <option key={t.id} value={t.id}>{t.nome}</option>
             ))}
+            {categoria === "aula" && <option value="unificada">Unificada (Homens + Mulheres)</option>}
           </select>
         </div>
       )}

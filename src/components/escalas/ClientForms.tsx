@@ -98,6 +98,10 @@ export function FormularioEscala({ turmaId, professores }: { turmaId: string; pr
           <option value="substituicao">Substituição</option>
         </select>
       </div>
+      <label className="flex items-center gap-2 pb-2 text-sm">
+        <input type="checkbox" name="unificada" className="h-4 w-4 accent-primary" />
+        Aula unificada (Homens + Mulheres)
+      </label>
       <Botao texto="Escalar" textoCarregando="Salvando…" />
       <Mensagens estado={estado} />
     </form>

@@ -18,6 +18,7 @@ export const MENU_COORDENACAO: ItemMenu[] = [
 
 export const MENU_PROFESSOR: ItemMenu[] = [
   { href: "/minha-turma", rotulo: "MINHA TURMA" },
+  { href: "/escalas-avisos", rotulo: "ESCALAS & AVISOS" },
   { href: "/biblioteca", rotulo: "BIBLIOTECA" },
   { href: "/auxilio", rotulo: "AUXÍLIO AO PROFESSOR" },
 ];

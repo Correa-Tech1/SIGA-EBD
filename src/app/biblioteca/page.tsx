@@ -36,7 +36,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
   const podeApagarAula = (m: (typeof aulas)[number]) => ehCoord || (ehProf && m.enviado_por === sessao.pessoaId);
   const gruposAula = [
     ...turmas.filter((t) => !turmaFiltro || t.id === turmaFiltro.id).map((t) => ({ id: t.id as string | null, nome: t.nome })),
-    ...(!turmaFiltro ? [{ id: null as string | null, nome: "Sem turma definida" }] : []),
+    { id: null as string | null, nome: "Aulas unificadas (Homens + Mulheres)" },
   ]
     .map((g) => ({ ...g, itens: aulas.filter((m) => (m.turma_id ?? null) === g.id) }))
     .filter((g) => g.id !== null || g.itens.length > 0);
@@ -98,8 +98,8 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
         </div>
         <div className="space-y-5">
           {gruposAula.map((g) => (
-            <div key={g.id ?? "sem"} className="rounded-lg border border-border-light p-4" style={g.id ? { borderLeft: `4px solid ${corDaTurma(g.nome)}` } : undefined}>
-              <h3 className="mb-3 font-display text-base font-semibold" style={g.id ? { color: corDaTurma(g.nome) } : undefined}>
+            <div key={g.id ?? "unificada"} className="rounded-lg border border-border-light p-4" style={{ borderLeft: `4px solid ${g.id ? corDaTurma(g.nome) : "#101E24"}` }}>
+              <h3 className="mb-3 font-display text-base font-semibold" style={{ color: g.id ? corDaTurma(g.nome) : "#101E24" }}>
                 {g.nome}
               </h3>
               <div className="grid gap-4 md:grid-cols-2">

@@ -1,5 +1,6 @@
 import { urlPublicaMaterial, type Material } from "@/lib/biblioteca/queries";
 import { BotaoApagarMaterial } from "./ClientForms";
+import { TituloMaterial } from "./TituloMaterial";
 
 const ICONE_POR_TIPO: Record<string, string> = {
   pdf: "📄",
@@ -43,24 +44,18 @@ export function ListaMateriais({
         return (
           <div
             key={material.id}
-            className={`flex items-center justify-between px-4 py-3 ${
+            className={`flex items-center justify-between gap-3 px-4 py-3 ${
               i > 0 ? "border-t border-border-light" : ""
             }`}
           >
-            <a
+            <TituloMaterial
+              materialId={material.id}
+              titulo={material.titulo}
               href={urlPublicaMaterial(material.caminho_arquivo)}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 text-sm text-primary hover:underline"
-            >
-              <span>{ICONE_POR_TIPO[material.tipo_arquivo] ?? "📎"}</span>
-              <span>
-                {material.titulo}
-                {detalhe && (
-                  <span className="block text-xs font-normal text-text-secondary">{detalhe(material)}</span>
-                )}
-              </span>
-            </a>
+              icone={ICONE_POR_TIPO[material.tipo_arquivo] ?? "📎"}
+              detalhe={detalhe?.(material)}
+              editavel={apagavel}
+            />
             {apagavel && <BotaoApagarMaterial materialId={material.id} />}
           </div>
         );

@@ -46,18 +46,43 @@ export async function criarEscala(
     .maybeSingle();
   if (!professor) return { erro: "Só professores cadastrados na aba Professores podem ser escalados." };
 
-  const { error } = await supabase.from("escalas").insert({
-    turma_id: turmaId,
-    pessoa_id: pessoaId,
-    data,
-    tipo: tipo as "regular" | "convidado" | "substituicao",
-  });
+  // Aula unificada: o mesmo professor dá aula para Homens e Mulheres juntos.
+  // Grava a escala nas duas turmas (a contagem de aulas dadas conta uma só).
+  let turmaIds = [turmaId];
+  if (formData.get("unificada")) {
+    const { data: atual } = await supabase.from("turmas").select("semestre_id").eq("id", turmaId).maybeSingle();
+    const { data: irmas } = atual
+      ? await supabase.from("turmas").select("id, nome").eq("semestre_id", atual.semestre_id)
+      : { data: [] as { id: string; nome: string }[] };
+    const alvo = (irmas ?? []).filter((t) => /homens|mulheres/i.test(t.nome));
+    if (alvo.length < 2) return { erro: "Não encontrei as turmas de Homens e Mulheres deste semestre." };
+    turmaIds = alvo.map((t) => t.id);
+  }
+
+  const { data: jaExistem } = await supabase
+    .from("escalas")
+    .select("turma_id")
+    .eq("pessoa_id", pessoaId)
+    .eq("data", data)
+    .in("turma_id", turmaIds);
+  const jaTem = new Set((jaExistem ?? []).map((e) => e.turma_id));
+  const novas = turmaIds.filter((t) => !jaTem.has(t));
+  if (novas.length === 0) return { erro: "Este professor já está escalado nessa data." };
+
+  const { error } = await supabase.from("escalas").insert(
+    novas.map((t) => ({
+      turma_id: t,
+      pessoa_id: pessoaId,
+      data,
+      tipo: tipo as "regular" | "convidado" | "substituicao",
+    }))
+  );
 
   if (error) return { erro: `Falha ao escalar: ${error.message}` };
 
   revalidatePath("/escalas");
   revalidatePath("/minha-turma");
-  return { sucesso: "Escala criada." };
+  return { sucesso: turmaIds.length > 1 ? "Escala unificada criada (Homens e Mulheres)." : "Escala criada." };
 }
 
 export async function removerEscala(
@@ -74,7 +99,11 @@ export async function removerEscala(
   if (!escalaId) return { erro: "Escala inválida." };
 
   const supabase = createClient();
-  const { error } = await supabase.from("escalas").delete().eq("id", escalaId);
+  // escala unificada tem uma linha por turma: remove a do mesmo professor e data em todas
+  const { data: escala } = await supabase.from("escalas").select("pessoa_id, data").eq("id", escalaId).maybeSingle();
+  const { error } = escala
+    ? await supabase.from("escalas").delete().eq("pessoa_id", escala.pessoa_id).eq("data", escala.data)
+    : await supabase.from("escalas").delete().eq("id", escalaId);
   if (error) return { erro: `Falha ao remover: ${error.message}` };
 
   revalidatePath("/escalas");

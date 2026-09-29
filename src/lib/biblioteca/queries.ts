@@ -64,7 +64,8 @@ export async function listarPrateleira(
     )
     .eq("categoria", categoria)
     .order("criado_em", { ascending: false });
-  if (turmaId) consulta = consulta.eq("turma_id", turmaId);
+  // aula unificada (turma_id nulo) vale para as duas turmas
+  if (turmaId) consulta = consulta.or(`turma_id.eq.${turmaId},turma_id.is.null`);
   const { data } = await consulta;
   return (data ?? []) as Material[];
 }

@@ -254,13 +254,15 @@ export async function registrarMaterial(entrada: {
   if (!titulo.trim()) return { erro: "Informe o título." };
 
   let papel: "slides" | "apoio" | null = null;
+  // "unificada" = aula dada juntando Homens e Mulheres: fica sem turma única (turma_id nulo)
+  const unificada = entrada.turmaId === "unificada";
   if (categoria === "aula") {
-    if (!entrada.turmaId) return { erro: "Escolha a turma da aula." };
+    if (!entrada.turmaId) return { erro: "Escolha a turma da aula (ou Unificada)." };
     if (entrada.papel !== "slides" && entrada.papel !== "apoio") {
       return { erro: "Diga se é slide da aula ou material de apoio." };
     }
     papel = entrada.papel;
-    if (sessao.role === "professor") {
+    if (sessao.role === "professor" && !unificada) {
       const { data: minhas } = await createClient().rpc("minhas_turmas");
       if (!((minhas ?? []) as unknown as string[]).includes(entrada.turmaId)) {
         return { erro: "Você só publica aulas nas turmas em que está escalado." };
@@ -275,7 +277,7 @@ export async function registrarMaterial(entrada: {
   const { error } = await supabase.from("materiais").insert({
     origem: categoria === "aula" ? "de_aula" : "oficial",
     categoria: categoria as "livro" | "institucional" | "aula",
-    turma_id: entrada.turmaId || null,
+    turma_id: unificada ? null : entrada.turmaId || null,
     papel,
     enviado_por: sessao.pessoaId,
     titulo: titulo.trim(),
@@ -290,4 +292,40 @@ export async function registrarMaterial(entrada: {
   revalidatePath("/biblioteca");
   revalidatePath("/aba-aluno");
   return { sucesso: "Publicado." };
+}
+
+// Renomeia o título de um material. Coordenação renomeia qualquer um; professor
+// só o que ele mesmo enviou (o RLS também garante isso).
+export async function renomearMaterial(
+  materialId: string,
+  titulo: string
+): Promise<EstadoForm> {
+  let sessao;
+  try {
+    sessao = await exigirProfessorOuCoordenacao();
+  } catch {
+    return { erro: "Ação restrita a professores e coordenação." };
+  }
+  const limpo = titulo.trim().slice(0, 160);
+  if (!limpo) return { erro: "Dê um nome ao arquivo." };
+
+  const supabase = createClient();
+  const { data: material } = await supabase
+    .from("materiais")
+    .select("id, enviado_por")
+    .eq("id", materialId)
+    .maybeSingle();
+  if (!material) return { erro: "Material não encontrado." };
+  if (sessao.role !== "coordenacao" && material.enviado_por !== sessao.pessoaId) {
+    return { erro: "Você só pode renomear materiais que você mesmo enviou." };
+  }
+
+  const { error } = await supabase.from("materiais").update({ titulo: limpo }).eq("id", materialId);
+  if (error) return { erro: `Falha ao renomear: ${error.message}` };
+
+  revalidatePath("/biblioteca");
+  revalidatePath("/minha-turma");
+  revalidatePath("/frequencia");
+  revalidatePath("/aba-aluno");
+  return { sucesso: "Nome atualizado." };
 }

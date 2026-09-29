@@ -119,7 +119,7 @@ export async function publicarGeradoNaBiblioteca(entrada: {
     titulo: entrada.nome.replace(/\.pptx$/i, ""),
     tipo: "pptx",
     caminho: destino,
-    turmaId: entrada.turmaId,
+    turmaId: entrada.turmaId, // "unificada" é aceito por registrarMaterial
     papel: "slides",
   });
   return r.erro ? { erro: r.erro } : { sucesso: "Publicado na Biblioteca, em Aulas → Slides." };

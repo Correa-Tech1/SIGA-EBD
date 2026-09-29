@@ -12,10 +12,13 @@ export async function PainelEscalas({
   turma,
   todasAsTurmas,
   podeGerenciar,
+  turmasParaAviso,
 }: {
   turma: Turma;
   todasAsTurmas: Turma[];
   podeGerenciar: boolean;
+  // turmas onde quem está vendo pode postar aviso (professor: só as próprias)
+  turmasParaAviso?: Turma[];
 }) {
   const [escalas, avisos, pessoas, sessao] = await Promise.all([
     listarEscalas(turma.id),
@@ -43,6 +46,11 @@ export async function PainelEscalas({
               >
                 <div className="text-sm">
                   {new Date(e.data + "T00:00:00").toLocaleDateString("pt-BR")} — {e.pessoa_nome}
+                  {e.unificada && (
+                    <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                      unificada
+                    </span>
+                  )}
                   {e.tipo !== "regular" && (
                     <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent">
                       {e.tipo}
@@ -88,7 +96,7 @@ export async function PainelEscalas({
         )}
 
         {sessao.autenticado && (
-          <FormularioAviso turmas={podeGerenciar ? todasAsTurmas : [turma]} />
+          <FormularioAviso turmas={turmasParaAviso ?? (podeGerenciar ? todasAsTurmas : [turma])} />
         )}
       </div>
     </div>

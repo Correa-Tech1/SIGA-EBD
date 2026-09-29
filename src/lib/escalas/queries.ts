@@ -10,6 +10,7 @@ export interface Escala {
 
 export interface EscalaComNome extends Escala {
   pessoa_nome: string;
+  unificada: boolean; // mesmo professor e data em mais de uma turma
 }
 
 export interface Aviso {
@@ -79,7 +80,22 @@ export async function listarEscalas(turmaId: string): Promise<EscalaComNome[]> {
     .in("id", linhas.map((e) => e.pessoa_id));
   const nomesPorId = new Map((pessoas ?? []).map((p) => [p.id, p.nome]));
 
-  return linhas.map((e) => ({ ...e, pessoa_nome: nomesPorId.get(e.pessoa_id) ?? "(sem nome)" }));
+  const { data: mesmasDatas } = await supabase
+    .from("escalas")
+    .select("pessoa_id, turma_id, data")
+    .in("pessoa_id", [...new Set(linhas.map((e) => e.pessoa_id))])
+    .in("data", [...new Set(linhas.map((e) => e.data))]);
+  const turmasPorDia = new Map<string, Set<string>>();
+  for (const e of mesmasDatas ?? []) {
+    const k = `${e.pessoa_id}|${e.data}`;
+    turmasPorDia.set(k, (turmasPorDia.get(k) ?? new Set()).add(e.turma_id));
+  }
+
+  return linhas.map((e) => ({
+    ...e,
+    pessoa_nome: nomesPorId.get(e.pessoa_id) ?? "(sem nome)",
+    unificada: (turmasPorDia.get(`${e.pessoa_id}|${e.data}`)?.size ?? 0) > 1,
+  }));
 }
 
 // Escala de UMA pessoa específica (usado em "Minha escala" do professor) —

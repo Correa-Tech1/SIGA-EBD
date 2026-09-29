@@ -62,7 +62,10 @@ export async function carregarProfessores(hoje: string, proximoDomingo: string) 
 
   const nomeTurma = (id: string) => turmas.find((t) => t.id === id)?.nome ?? "Turma";
   const linhas: LinhaProfessor[] = (professores ?? []).map((p) => {
-    const minhas = [...unicas.values()].filter((e) => e.pessoa_id === p.id);
+    // aula unificada (Homens + Mulheres) tem uma escala por turma, mas é UMA aula dada
+    const porDia = new Map<string, { pessoa_id: string; turma_id: string; data: string }>();
+    for (const e of unicas.values()) if (e.pessoa_id === p.id) porDia.set(e.data, e);
+    const minhas = [...porDia.values()];
     const porMes = Array(12).fill(0) as number[];
     for (const e of minhas) porMes[Number(e.data.slice(5, 7)) - 1] += 1;
     const meusPrep = (preparos ?? []).filter((x) => x.pessoa_id === p.id);
