@@ -20,7 +20,7 @@ export function UploadBiblioteca({
   turmas,
   turmaPadrao,
 }: {
-  categoria: "livro" | "institucional" | "aula";
+  categoria: "livro" | "institucional" | "aula" | "apoio_professor";
   pessoaId: string | null;
   turmas?: { id: string; nome: string }[];
   turmaPadrao?: string;
@@ -38,7 +38,8 @@ export function UploadBiblioteca({
     if (categoria === "aula" && !turmaId) return setStatus({ tipo: "erro", texto: "Escolha a turma da aula." });
 
     const supabase = createClient();
-    const pasta = categoria === "livro" ? "livros/geral" : categoria === "institucional" ? "institucional/geral" : `aulas/${pessoaId}`;
+    const pasta =
+      categoria === "livro" ? "livros/geral" : categoria === "institucional" ? "institucional/geral" : categoria === "apoio_professor" ? "apoio-professor/geral" : `aulas/${pessoaId}`;
     let enviados = 0;
     for (const arquivo of arquivos) {
       const ext = (arquivo.name.split(".").pop() ?? "").toLowerCase();

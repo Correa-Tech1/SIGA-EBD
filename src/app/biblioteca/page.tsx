@@ -6,7 +6,7 @@ import { getSessaoAtual } from "@/lib/auth/session";
 import { listarMinhasTurmasIds } from "@/lib/frequencia/queries";
 import { corDaTurma } from "@/lib/relatorio/cores";
 
-// Biblioteca da EBD em três prateleiras. Leitura para todos (inclusive quem
+// Biblioteca da EBD em prateleiras. Leitura para todos (inclusive quem
 // não fez login); publicar/remover depende do papel:
 //   Livros e Institucionais -> coordenação
 //   Aulas                   -> professor (o que ele enviou) e coordenação (tudo)
@@ -16,10 +16,13 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
   const ehProf = sessao.role === "professor";
   const turmaFiltro = turmas.find((t) => t.id === searchParams.turma);
 
-  const [livros, institucionais, aulas] = await Promise.all([
+  // Apoio ao Professor só aparece para quem está logado como professor ou coordenação
+  const veApoio = ehCoord || ehProf;
+  const [livros, institucionais, aulas, apoio] = await Promise.all([
     listarPrateleira("livro"),
     listarPrateleira("institucional"),
     listarPrateleira("aula", turmaFiltro?.id),
+    veApoio ? listarPrateleira("apoio_professor") : Promise.resolve([]),
   ]);
   const autores = await nomesDePessoas(aulas.map((m) => m.enviado_por).filter((x): x is string => !!x));
   const turmaPorId = new Map(turmas.map((t) => [t.id, t.nome]));
@@ -44,6 +47,9 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
   const prateleiras = [
     { id: "livros", titulo: "Livros", descricao: "Os livros-base de cada módulo e obras de apoio.", itens: livros },
     { id: "institucionais", titulo: "Materiais institucionais", descricao: "Plano pedagógico, estatuto, metodologia e documentos da EBD.", itens: institucionais },
+    ...(veApoio
+      ? [{ id: "apoio", titulo: "Apoio ao Professor", descricao: "Materiais para apoiar os professores em geral: didática, preparo de aula, modelos e orientações. Visível só para professores e coordenação.", itens: apoio }]
+      : []),
   ];
 
   return (
@@ -56,6 +62,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
         <nav className="mt-3 flex gap-4 text-sm text-primary">
           <a href="#livros" className="hover:underline">Livros</a>
           <a href="#institucionais" className="hover:underline">Institucionais</a>
+          {veApoio && <a href="#apoio" className="hover:underline">Apoio ao Professor</a>}
           <a href="#aulas" className="hover:underline">Aulas</a>
         </nav>
       </div>
@@ -69,7 +76,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
             podeApagar={ehCoord}
             detalhe={(m) => new Date(m.criado_em).toLocaleDateString("pt-BR")}
           />
-          {ehCoord && <UploadBiblioteca categoria={p.id === "livros" ? "livro" : "institucional"} pessoaId={sessao.pessoaId} />}
+          {ehCoord && <UploadBiblioteca categoria={p.id === "livros" ? "livro" : p.id === "apoio" ? "apoio_professor" : "institucional"} pessoaId={sessao.pessoaId} />}
         </section>
       ))}
 

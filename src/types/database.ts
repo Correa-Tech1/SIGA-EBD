@@ -102,7 +102,7 @@ export interface Database {
           titulo: string;
           tipo_arquivo: string;
           caminho_arquivo: string;
-          categoria: "livro" | "institucional" | "aula";
+          categoria: "livro" | "institucional" | "aula" | "apoio_professor";
           turma_id: string | null;
           papel: "slides" | "apoio" | null;
           criado_em: string;

@@ -247,9 +247,9 @@ export async function registrarMaterial(entrada: {
   }
 
   const { categoria, titulo, tipo, caminho } = entrada;
-  if (!["livro", "institucional", "aula"].includes(categoria)) return { erro: "Categoria inválida." };
+  if (!["livro", "institucional", "aula", "apoio_professor"].includes(categoria)) return { erro: "Categoria inválida." };
   if (categoria !== "aula" && sessao.role !== "coordenacao") {
-    return { erro: "Livros e materiais institucionais são publicados pela coordenação." };
+    return { erro: "Livros, materiais institucionais e apoio ao professor são publicados pela coordenação." };
   }
   if (!titulo.trim()) return { erro: "Informe o título." };
 
@@ -270,13 +270,14 @@ export async function registrarMaterial(entrada: {
     }
   }
 
-  const pasta = categoria === "livro" ? "livros" : categoria === "institucional" ? "institucional" : "aulas";
+  const pasta =
+    categoria === "livro" ? "livros" : categoria === "institucional" ? "institucional" : categoria === "apoio_professor" ? "apoio-professor" : "aulas";
   if (!caminho.startsWith(`${pasta}/`) || caminho.includes("..")) return { erro: "Caminho inválido." };
 
   const supabase = createClient();
   const { error } = await supabase.from("materiais").insert({
     origem: categoria === "aula" ? "de_aula" : "oficial",
-    categoria: categoria as "livro" | "institucional" | "aula",
+    categoria: categoria as "livro" | "institucional" | "aula" | "apoio_professor",
     turma_id: unificada ? null : entrada.turmaId || null,
     papel,
     enviado_por: sessao.pessoaId,

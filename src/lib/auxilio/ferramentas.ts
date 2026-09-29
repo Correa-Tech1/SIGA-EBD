@@ -26,7 +26,7 @@ export const FERRAMENTAS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        categoria: { type: "string", enum: ["livro", "institucional", "aula"], description: "Filtrar por prateleira (opcional)." },
+        categoria: { type: "string", enum: ["livro", "institucional", "aula", "apoio_professor"], description: "Filtrar por prateleira (opcional)." },
         busca: { type: "string", description: "Trecho do título (opcional)." },
       },
     },
@@ -129,7 +129,7 @@ export async function executarFerramenta(
       .select("id, titulo, categoria, tipo_arquivo, turma_id")
       .order("criado_em", { ascending: false })
       .limit(80);
-    if (typeof entrada.categoria === "string") q = q.eq("categoria", entrada.categoria as "livro" | "institucional" | "aula");
+    if (typeof entrada.categoria === "string") q = q.eq("categoria", entrada.categoria as "livro" | "institucional" | "aula" | "apoio_professor");
     if (typeof entrada.busca === "string" && entrada.busca.trim()) q = q.ilike("titulo", `%${entrada.busca.trim()}%`);
     const { data, error } = await q;
     if (error) return `Erro ao listar: ${error.message}`;
