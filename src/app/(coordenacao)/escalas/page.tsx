@@ -8,7 +8,7 @@ import { getSessaoAtual, somenteLeitura } from "@/lib/auth/session";
 export default async function EscalasPage({
   searchParams,
 }: {
-  searchParams: { turma?: string; data?: string };
+  searchParams: { turma?: string; data?: string; mes?: string };
 }) {
   const turmas = await listarTurmas();
   const leitura = somenteLeitura(await getSessaoAtual());
@@ -54,7 +54,7 @@ export default async function EscalasPage({
         </div>
       )}
 
-      <PainelEscalas basePath="/escalas" dataInicial={searchParams.data} turma={turmaAtual} todasAsTurmas={turmas} podeGerenciar={!leitura} />
+      <PainelEscalas basePath="/escalas" dataInicial={searchParams.data} mes={searchParams.mes} turma={turmaAtual} todasAsTurmas={turmas} podeGerenciar={!leitura} />
     </div>
   );
 }

@@ -17,6 +17,7 @@ export async function PainelEscalas({
   turmasParaAviso,
   basePath,
   dataInicial,
+  mes,
 }: {
   turma: Turma;
   todasAsTurmas: Turma[];
@@ -25,6 +26,7 @@ export async function PainelEscalas({
   turmasParaAviso?: Turma[];
   basePath: string; // "/escalas" ou "/escalas-avisos" (links de Escalar)
   dataInicial?: string;
+  mes?: string; // "YYYY-MM"
 }) {
   const [escalas, avisos, pessoas, sessao, semestre] = await Promise.all([
     listarEscalas(turma.id),
@@ -52,6 +54,8 @@ export async function PainelEscalas({
         semestreFim={semestre?.data_fim ?? null}
         podeGerenciar={podeGerenciar}
         minhaPessoaId={sessao.pessoaId}
+        mesSelecionado={mes ?? dataInicial?.slice(0, 7)}
+        hrefMes={(m) => `${basePath}?turma=${turma.id}&mes=${m}`}
         hrefEscalar={(d) => `${basePath}?turma=${turma.id}&data=${d}#escalar`}
       />
 

@@ -71,6 +71,8 @@ export function CalendarioEscalas({
   podeGerenciar,
   minhaPessoaId,
   hrefEscalar,
+  hrefMes,
+  mesSelecionado,
 }: {
   turma: Turma;
   escalas: EscalaComNome[];
@@ -80,34 +82,99 @@ export function CalendarioEscalas({
   podeGerenciar: boolean;
   minhaPessoaId?: string | null;
   hrefEscalar: (data: string) => string;
+  hrefMes: (mes: string) => string; // mes = "YYYY-MM"
+  mesSelecionado?: string; // "YYYY-MM" (padrão: mês atual)
 }) {
   const cor = corDaTurma(turma.nome);
   const dias = montarDias(turma, escalas, semestreInicio, semestreFim);
   const porData = new Map(escalas.map((e) => [e.data, e]));
 
-  const diasDeAula = dias.filter((d) => d.tipo !== "sem_aula");
-  const escalados = diasDeAula.filter((d) => porData.has(d.data)).length;
-  const faltam = diasDeAula.filter((d) => d.data >= hoje && !porData.has(d.data)).length;
-  const proxima = diasDeAula.find((d) => d.data >= hoje)?.data ?? null;
-  const semAulaFuturos = dias.filter((d) => d.tipo === "sem_aula" && d.data >= hoje).length;
-
-  const meses: { chave: string; rotulo: string; dias: Dia[] }[] = [];
+  const meses: { chave: string; curto: string; ano: number; dias: Dia[] }[] = [];
   for (const d of dias) {
     const p = partes(d.data);
-    const chave = `${p.ano}-${p.mes}`;
+    const chave = d.data.slice(0, 7);
     let m = meses.find((x) => x.chave === chave);
-    if (!m) meses.push((m = { chave, rotulo: `${MESES[p.mes]} ${p.ano}`, dias: [] }));
+    if (!m) meses.push((m = { chave, curto: MES_CURTO[p.mes], ano: p.ano, dias: [] }));
     m.dias.push(d);
   }
 
+  // mês mostrado: o escolhido; senão o atual; senão o próximo com aula; senão o último
+  const mesAtual = hoje.slice(0, 7);
+  const chaveAtiva =
+    (mesSelecionado && meses.some((m) => m.chave === mesSelecionado) && mesSelecionado) ||
+    (meses.some((m) => m.chave === mesAtual) && mesAtual) ||
+    meses.find((m) => m.chave > mesAtual)?.chave ||
+    meses[meses.length - 1]?.chave;
+  const ativo = meses.find((m) => m.chave === chaveAtiva);
+  const indice = meses.findIndex((m) => m.chave === chaveAtiva);
+
+  const aulasDe = (lista: Dia[]) => lista.filter((d) => d.tipo !== "sem_aula");
+  const faltamDe = (lista: Dia[]) => aulasDe(lista).filter((d) => d.data >= hoje && !porData.has(d.data)).length;
+  const proxima = dias.filter((d) => d.tipo !== "sem_aula").find((d) => d.data >= hoje)?.data ?? null;
+
+  if (!ativo) return <p className="text-sm text-text-secondary">Sem datas para mostrar.</p>;
+  const diasAula = aulasDe(ativo.dias);
+  const comProf = diasAula.filter((d) => porData.has(d.data)).length;
+  const aEscalar = faltamDe(ativo.dias);
+  const semAulaMes = ativo.dias.filter((d) => d.tipo === "sem_aula").length;
+
   return (
-    <div className="space-y-5">
-      {/* faixa-resumo */}
+    <div id="calendario" className="scroll-mt-4 space-y-5">
+      {/* seletor de mês */}
+      <div className="flex items-center gap-2">
+        {indice > 0 ? (
+          <Link href={`${hrefMes(meses[indice - 1].chave)}#calendario`} aria-label="Mês anterior" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-lg text-primary">
+            ‹
+          </Link>
+        ) : (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border-light text-lg text-border">‹</span>
+        )}
+        <div className="flex flex-1 gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Mês">
+          {meses.map((m) => {
+            const ehAtivo = m.chave === ativo.chave;
+            const falta = faltamDe(m.dias);
+            const passado = m.chave < mesAtual;
+            return (
+              <Link
+                key={m.chave}
+                href={`${hrefMes(m.chave)}#calendario`}
+                role="tab"
+                aria-selected={ehAtivo}
+                style={ehAtivo ? { background: cor, borderColor: cor, color: "#fff" } : undefined}
+                className={`relative shrink-0 rounded-full border px-4 py-1.5 text-sm font-semibold tracking-wide ${
+                  ehAtivo ? "" : `border-border bg-surface ${passado ? "text-text-secondary/60" : "text-text-secondary hover:border-primary"}`
+                }`}
+              >
+                {m.curto}
+                {m.chave === mesAtual && !ehAtivo && <span className="ml-1 text-[10px] text-primary">●</span>}
+                {falta > 0 && (
+                  <span className="absolute -right-1 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#D9930D] px-1 text-[10px] font-bold text-white" title={`${falta} aula(s) sem professor`}>
+                    {falta}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+        {indice < meses.length - 1 ? (
+          <Link href={`${hrefMes(meses[indice + 1].chave)}#calendario`} aria-label="Próximo mês" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-lg text-primary">
+            ›
+          </Link>
+        ) : (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border-light text-lg text-border">›</span>
+        )}
+      </div>
+
+      <h3 className="font-display text-2xl font-semibold text-text-primary">
+        {MESES[partes(ativo.dias[0].data).mes].charAt(0) + MESES[partes(ativo.dias[0].data).mes].slice(1).toLowerCase()}{" "}
+        <span className="text-text-secondary">{ativo.ano}</span>
+      </h3>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Resumo valor={diasDeAula.length} rotulo="domingos de aula" cor={cor} />
-        <Resumo valor={escalados} rotulo="com professor" cor="#1B6B3A" />
-        <Resumo valor={faltam} rotulo="a escalar" cor={faltam > 0 ? "#B26A00" : "#5B6B76"} destaque={faltam > 0} />
-        <Resumo valor={semAulaFuturos} rotulo="domingos sem aula" cor="#5B6B76" />
+        <Resumo valor={diasAula.length} rotulo={diasAula.length === 1 ? "domingo de aula" : "domingos de aula"} cor={cor} />
+        <Resumo valor={comProf} rotulo="com professor" cor="#1B6B3A" />
+        <Resumo valor={aEscalar} rotulo="a escalar" cor={aEscalar > 0 ? "#B26A00" : "#5B6B76"} destaque={aEscalar > 0} />
+        <Resumo valor={semAulaMes} rotulo={semAulaMes === 1 ? "domingo sem aula" : "domingos sem aula"} cor="#5B6B76" />
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary">
@@ -118,26 +185,21 @@ export function CalendarioEscalas({
         </Legenda>
       </div>
 
-      {meses.map((m) => (
-        <section key={m.chave}>
-          <h3 className="mb-2 font-display text-sm font-semibold tracking-widest text-text-secondary">{m.rotulo}</h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {m.dias.map((d) => (
-              <CartaoDia
-                key={d.data}
-                dia={d}
-                escala={porData.get(d.data) ?? null}
-                cor={cor}
-                hoje={hoje}
-                eProxima={d.data === proxima}
-                podeGerenciar={podeGerenciar}
-                minhaPessoaId={minhaPessoaId ?? null}
-                hrefEscalar={hrefEscalar(d.data)}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {ativo.dias.map((d) => (
+          <CartaoDia
+            key={d.data}
+            dia={d}
+            escala={porData.get(d.data) ?? null}
+            cor={cor}
+            hoje={hoje}
+            eProxima={d.data === proxima}
+            podeGerenciar={podeGerenciar}
+            minhaPessoaId={minhaPessoaId ?? null}
+            hrefEscalar={hrefEscalar(d.data)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
