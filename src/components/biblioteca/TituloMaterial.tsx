@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { moverMaterial, renomearMaterial } from "@/lib/biblioteca/actions";
 import { ROTULO_PRATELEIRA, type Prateleira } from "./UploadBiblioteca";
 
@@ -24,13 +24,15 @@ export function TituloMaterial({
   editavel,
   mover,
   atual: local,
+  variante = "lista",
 }: {
+  variante?: "lista" | "cartao";
   mover?: ConfigMover;
   atual?: LocalAtual;
   materialId: string;
   titulo: string;
   href: string;
-  icone: string;
+  icone: ReactNode;
   detalhe?: string;
   editavel: boolean;
 }) {
@@ -96,8 +98,36 @@ export function TituloMaterial({
     );
   }
 
+  const acoes = editavel && (
+    <div className={`flex shrink-0 gap-3 text-xs ${variante === "cartao" ? "mt-2" : ""}`}>
+      <button type="button" onClick={() => setEditando(true)} className="text-primary hover:underline">
+        renomear
+      </button>
+      {mover && (
+        <button type="button" onClick={() => setMovendo((v) => !v)} className="text-primary hover:underline">
+          mover
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-w-0 flex-1">
+    {variante === "cartao" ? (
+      <>
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          title={atual}
+          className="line-clamp-3 break-words font-display text-[15px] font-semibold leading-snug text-text-primary hover:text-primary"
+        >
+          {atual}
+        </a>
+        {detalhe && <div className="mt-1 text-xs text-text-secondary">{detalhe}</div>}
+        {acoes}
+      </>
+    ) : (
     <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
       <a href={href} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-2 text-sm text-primary hover:underline">
         <span>{icone}</span>
@@ -106,19 +136,9 @@ export function TituloMaterial({
           {detalhe && <span className="block text-xs font-normal text-text-secondary">{detalhe}</span>}
         </span>
       </a>
-      {editavel && (
-        <div className="flex shrink-0 gap-3 text-xs">
-          <button type="button" onClick={() => setEditando(true)} className="text-primary hover:underline">
-            renomear
-          </button>
-          {mover && (
-            <button type="button" onClick={() => setMovendo((v) => !v)} className="text-primary hover:underline">
-              mover
-            </button>
-          )}
-        </div>
-      )}
+      {acoes}
     </div>
+    )}
     {movendo && mover && (
       <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg bg-bg p-2 text-xs">
         <label className="flex flex-col gap-1">
