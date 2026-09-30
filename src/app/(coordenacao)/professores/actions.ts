@@ -233,3 +233,52 @@ export async function atualizarTipoProfessor(
   revalidatePath("/coordenacao");
   return { sucesso: "Tipo atualizado." };
 }
+
+// Conta do Pastor: acompanha tudo em modo leitura (nenhuma ação de escrita
+// aceita esse papel). Criada só pela coordenação, como as de professor.
+export async function criarPastor(
+  _estadoAnterior: EstadoCriarProfessor,
+  formData: FormData
+): Promise<EstadoCriarProfessor> {
+  try {
+    await exigirCoordenacao();
+  } catch {
+    return { erro: "Ação restrita à coordenação." };
+  }
+  const nome = String(formData.get("nome") ?? "").trim();
+  const usuario = String(formData.get("usuario") ?? "").trim();
+  if (!nome || !usuario) return { erro: "Preencha nome e usuário." };
+  if (!/^[a-z0-9._-]+$/i.test(usuario)) {
+    return { erro: "Usuário deve conter só letras, números, ponto, hífen ou underline." };
+  }
+  const senhaInformada = String(formData.get("senha") ?? "").trim();
+  if (senhaInformada && senhaInformada.length < 6) return { erro: "A senha precisa ter pelo menos 6 caracteres." };
+  const senha = senhaInformada || gerarSenhaProvisoria();
+
+  const admin = createAdminClient();
+  const { data: userData, error: userError } = await admin.auth.admin.createUser({
+    email: emailSintetico(usuario),
+    password: senha,
+    email_confirm: true,
+  });
+  if (userError) {
+    return {
+      erro: userError.message.toLowerCase().includes("already")
+        ? `Já existe uma conta com o usuário "${usuario}".`
+        : `Falha ao criar conta: ${userError.message}`,
+    };
+  }
+  const { error: pessoaError } = await admin.from("pessoas").insert({
+    auth_user_id: userData.user.id,
+    nome,
+    tipo: "membro",
+    role: "pastor",
+    senha_cifrada: cifrarSenha(senha),
+  });
+  if (pessoaError) {
+    await admin.auth.admin.deleteUser(userData.user.id);
+    return { erro: `Falha ao registrar o pastor (o SQL 0013 foi rodado?): ${pessoaError.message}` };
+  }
+  revalidatePath("/professores");
+  return { sucesso: `Conta criada para ${nome}. A senha fica visível na lista abaixo.`, senhaGerada: senha };
+}

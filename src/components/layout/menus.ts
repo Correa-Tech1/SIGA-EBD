@@ -16,6 +16,15 @@ export const MENU_COORDENACAO: ItemMenu[] = [
   { href: "/coordenacao", rotulo: "COORDENAÇÃO" },
 ];
 
+// Pastor: acompanha tudo em modo leitura (sem Professores nem Auxílio).
+export const MENU_PASTOR: ItemMenu[] = [
+  { href: "/dashboard", rotulo: "INÍCIO" },
+  { href: "/frequencia", rotulo: "FREQUÊNCIA" },
+  { href: "/biblioteca", rotulo: "BIBLIOTECA" },
+  { href: "/escalas", rotulo: "ESCALAS & AVISOS" },
+  { href: "/coordenacao", rotulo: "COORDENAÇÃO" },
+];
+
 export const MENU_PROFESSOR: ItemMenu[] = [
   { href: "/minha-turma", rotulo: "MINHA TURMA" },
   { href: "/escalas-avisos", rotulo: "ESCALAS & AVISOS" },

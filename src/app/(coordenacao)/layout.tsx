@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessaoAtual } from "@/lib/auth/session";
 import { Cabecalho } from "@/components/layout/Cabecalho";
 import { Rodape } from "@/components/layout/Rodape";
-import { MENU_COORDENACAO } from "@/components/layout/menus";
+import { MENU_COORDENACAO, MENU_PASTOR } from "@/components/layout/menus";
 
 // Segunda barreira (a primeira é o middleware): confirma que quem chegou
 // aqui é de fato coordenação antes de renderizar qualquer página do grupo.
@@ -17,11 +17,16 @@ export default async function CoordenacaoLayout({
   const sessao = await getSessaoAtual();
 
   if (!sessao.autenticado) redirect("/login");
-  if (sessao.role !== "coordenacao") redirect("/");
+  if (sessao.role !== "coordenacao" && sessao.role !== "pastor") redirect("/");
+  const pastor = sessao.role === "pastor";
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <Cabecalho itens={MENU_COORDENACAO} nome={sessao.nome} papel="Coordenação" />
+      <Cabecalho
+        itens={pastor ? MENU_PASTOR : MENU_COORDENACAO}
+        nome={sessao.nome}
+        papel={pastor ? "Pastor · somente leitura" : "Coordenação"}
+      />
       <main className="flex-grow p-10 print:p-0">{children}</main>
       <Rodape />
     </div>

@@ -3,7 +3,7 @@
 // jeito — um lugar para ajustar se a regra de papéis mudar.
 import { createClient } from "@/lib/supabase/server";
 
-export type PessoaRole = "coordenacao" | "professor" | null;
+export type PessoaRole = "coordenacao" | "professor" | "pastor" | null;
 
 export interface SessaoAtual {
   autenticado: boolean;
@@ -56,4 +56,10 @@ export async function exigirProfessorOuCoordenacao(): Promise<SessaoAtual> {
     throw new Error("Ação restrita a professores e coordenação.");
   }
   return sessao;
+}
+
+// Pastor: vê tudo (relatórios, escalas, Biblioteca, funcionamento), não altera
+// nada. Só leitura: nenhuma Server Action aceita esse papel.
+export function somenteLeitura(sessao: SessaoAtual): boolean {
+  return sessao.role === "pastor";
 }

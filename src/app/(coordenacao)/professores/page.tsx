@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getSessaoAtual } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listarTurmas } from "@/lib/estrutura/queries";
@@ -6,6 +8,7 @@ import { NovoProfessorForm } from "./NovoProfessorForm";
 import { ResetarSenhaBotao } from "./ResetarSenhaBotao";
 import { TurmasProfessorForm } from "./TurmasProfessorForm";
 import { SenhaVisivel } from "./SenhaVisivel";
+import { NovoPastorForm } from "./NovoPastorForm";
 import { decifrarSenha } from "@/lib/auth/senha-visivel";
 import { TipoProfessorForm } from "./TipoProfessorForm";
 
@@ -16,6 +19,8 @@ import { TipoProfessorForm } from "./TipoProfessorForm";
 // O "usuário" (login) só existe no Auth, então é lido com o admin client —
 // seguro aqui porque o layout da coordenação já barrou quem não é coordenação.
 export default async function ProfessoresPage() {
+  // pastor só acompanha (aba Coordenação); contas são da coordenação
+  if ((await getSessaoAtual()).role !== "coordenacao") redirect("/dashboard");
   const supabase = createClient();
   const [{ data: professores }, turmas, { data: vinculos }] = await Promise.all([
     supabase
@@ -31,6 +36,12 @@ export default async function ProfessoresPage() {
     .from("pessoas")
     .select("id, nome, professor_tipo")
     .eq("role", "coordenacao")
+    .order("nome");
+
+  const { data: pastores } = await supabase
+    .from("pessoas")
+    .select("id, nome, auth_user_id, senha_cifrada, criado_em")
+    .eq("role", "pastor")
     .order("nome");
 
   const turmasPorPessoa = new Map<string, Set<string>>();
@@ -96,6 +107,24 @@ export default async function ProfessoresPage() {
           })}
         </div>
       )}
+
+      <div className="mb-6 space-y-3">
+        <NovoPastorForm />
+        {(pastores ?? []).map((p) => (
+          <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-6 py-4">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-medium">
+                {p.nome}
+                <span className="rounded-full bg-border-light px-2 py-0.5 text-xs text-text-secondary">Pastor · leitura</span>
+              </div>
+              <div className="text-xs text-text-secondary">
+                <SenhaVisivel senha={decifrarSenha(p.senha_cifrada)} /> · criada em {new Date(p.criado_em).toLocaleDateString("pt-BR")}
+              </div>
+            </div>
+            {p.auth_user_id && <ResetarSenhaBotao authUserId={p.auth_user_id} />}
+          </div>
+        ))}
+      </div>
 
       <div className="space-y-3">
         {(professores ?? []).length === 0 && (

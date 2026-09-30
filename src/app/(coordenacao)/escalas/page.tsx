@@ -1,5 +1,6 @@
 import { listarTurmas } from "@/lib/estrutura/queries";
 import { PainelEscalas } from "@/components/escalas/PainelEscalas";
+import { getSessaoAtual, somenteLeitura } from "@/lib/auth/session";
 
 // Coordenação gerencia escala e avisos de qualquer turma (RLS: só
 // coordenação tem policy de escrita em `escalas`; avisos ela também apaga
@@ -10,6 +11,7 @@ export default async function EscalasPage({
   searchParams: { turma?: string };
 }) {
   const turmas = await listarTurmas();
+  const leitura = somenteLeitura(await getSessaoAtual());
 
   if (turmas.length === 0) {
     return (
@@ -52,7 +54,7 @@ export default async function EscalasPage({
         </div>
       )}
 
-      <PainelEscalas turma={turmaAtual} todasAsTurmas={turmas} podeGerenciar />
+      <PainelEscalas turma={turmaAtual} todasAsTurmas={turmas} podeGerenciar={!leitura} />
     </div>
   );
 }

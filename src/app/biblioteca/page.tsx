@@ -17,7 +17,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: {
   const turmaFiltro = turmas.find((t) => t.id === searchParams.turma);
 
   // Apoio ao Professor só aparece para quem está logado como professor ou coordenação
-  const veApoio = ehCoord || ehProf;
+  const veApoio = ehCoord || ehProf || sessao.role === "pastor";
   const [livros, institucionais, aulas, apoio] = await Promise.all([
     listarPrateleira("livro"),
     listarPrateleira("institucional"),

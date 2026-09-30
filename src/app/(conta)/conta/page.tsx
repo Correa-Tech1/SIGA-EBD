@@ -9,7 +9,7 @@ export default async function ContaPage() {
       <div>
         <h1 className="font-display text-2xl font-semibold text-primary">Minha conta</h1>
         <p className="mt-1 text-sm text-text-secondary">
-          {sessao.nome} · {sessao.role === "coordenacao" ? "Coordenação" : "Professor"}
+          {sessao.nome} · {sessao.role === "coordenacao" ? "Coordenação" : sessao.role === "pastor" ? "Pastor" : "Professor"}
         </p>
       </div>
       <div className="rounded-xl border border-border bg-surface p-6">

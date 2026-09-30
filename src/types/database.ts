@@ -5,7 +5,7 @@
 //
 //   npx supabase gen types typescript --project-id <seu-projeto> > src/types/database.ts
 
-export type PessoaRole = "coordenacao" | "professor";
+export type PessoaRole = "coordenacao" | "professor" | "pastor";
 export type PessoaTipo = "membro" | "visitante";
 export type PresencaStatus = "presente" | "ausente";
 export type MaterialOrigem = "oficial" | "de_aula";

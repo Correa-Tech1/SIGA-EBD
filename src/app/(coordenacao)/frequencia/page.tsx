@@ -3,6 +3,7 @@ import { FormularioSemestre, FormularioTurma, FormularioModulo } from "@/compone
 import { PainelFrequencia } from "@/components/frequencia/PainelFrequencia";
 import { VisaoGeral } from "@/components/frequencia/VisaoGeral";
 import { carregarRelatorio } from "@/lib/relatorio/dados";
+import { getSessaoAtual, somenteLeitura } from "@/lib/auth/session";
 
 // Coordenação vê e lança presença de QUALQUER turma (RLS: is_coordenacao()
 // libera tudo). Esta página também é onde a estrutura do semestre é
@@ -14,6 +15,7 @@ export default async function FrequenciaPage({
 }: {
   searchParams: { turma?: string; aula?: string };
 }) {
+  const leitura = somenteLeitura(await getSessaoAtual());
   const [semestres, turmas, { relatorio }] = await Promise.all([
     listarSemestres(),
     listarTurmas(),
@@ -44,11 +46,13 @@ export default async function FrequenciaPage({
         turmas={turmas}
         turmaSelecionadaId={searchParams.turma}
         aulaSelecionadaId={searchParams.aula}
-        podeGerenciarMatricula
+        podeGerenciarMatricula={!leitura}
+        somenteLeitura={leitura}
         baseUrl="/frequencia"
         relatorio={relatorio}
       />
 
+      {!leitura && (
       <details className="rounded-xl border border-border bg-surface p-5" open={turmas.length === 0}>
         <summary className="cursor-pointer font-display text-base font-semibold text-primary">
           Estrutura do semestre (semestre · turma · módulo)
@@ -59,6 +63,7 @@ export default async function FrequenciaPage({
           <FormularioModulo turmas={turmas} />
         </div>
       </details>
+      )}
     </div>
   );
 }

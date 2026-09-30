@@ -95,7 +95,7 @@ export async function PainelEscalas({
           </div>
         )}
 
-        {sessao.autenticado && (
+        {sessao.autenticado && sessao.role !== "pastor" && (
           <FormularioAviso turmas={turmasParaAviso ?? (podeGerenciar ? todasAsTurmas : [turma])} />
         )}
       </div>

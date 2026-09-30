@@ -5,7 +5,7 @@ import { getSessaoAtual } from "@/lib/auth/session";
 export default async function HomePage() {
   const sessao = await getSessaoAtual();
 
-  if (sessao.role === "coordenacao") redirect("/dashboard");
+  if (sessao.role === "coordenacao" || sessao.role === "pastor") redirect("/dashboard");
   if (sessao.role === "professor") redirect("/minha-turma");
   redirect("/login");
 }

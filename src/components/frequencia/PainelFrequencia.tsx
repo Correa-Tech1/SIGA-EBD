@@ -40,6 +40,7 @@ export async function PainelFrequencia({
   podeGerenciarMatricula,
   baseUrl,
   relatorio,
+  somenteLeitura = false,
 }: {
   turmas: Turma[];
   turmaSelecionadaId: string | undefined;
@@ -48,6 +49,7 @@ export async function PainelFrequencia({
   baseUrl: string;
   // só a coordenação passa: números da turma (idade, gênero) não vão ao professor
   relatorio?: RelatorioGeral;
+  somenteLeitura?: boolean; // pastor: vê tudo, não lança nem edita
 }) {
   if (turmas.length === 0) {
     return (
@@ -134,7 +136,7 @@ export async function PainelFrequencia({
 
           {aulasComChamada.length === 0 ? (
             <p className="rounded-xl border border-border bg-surface p-6 text-sm text-text-secondary">
-              Nenhuma chamada lançada ainda. Use “Lançar novo domingo” abaixo.
+              Nenhuma chamada lançada ainda.{!somenteLeitura && " Use “Lançar novo domingo” abaixo."}
             </p>
           ) : (
             <div className="rounded-xl border border-border bg-surface">
@@ -174,12 +176,14 @@ export async function PainelFrequencia({
                           {resumo?.temChamada ? "Ninguém marcado como presente." : "A chamada desta data ainda não foi lançada."}
                         </p>
                       )}
-                      <a
-                        href={`${baseUrl}?turma=${turmaAtual.id}&aula=${aula.id}#chamada`}
-                        className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
-                      >
-                        {resumo?.temChamada ? "Editar chamada desta data" : "Lançar chamada desta data"}
-                      </a>
+                      {!somenteLeitura && (
+                        <a
+                          href={`${baseUrl}?turma=${turmaAtual.id}&aula=${aula.id}#chamada`}
+                          className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
+                        >
+                          {resumo?.temChamada ? "Editar chamada desta data" : "Lançar chamada desta data"}
+                        </a>
+                      )}
                     </div>
                   </details>
                 );
@@ -187,7 +191,7 @@ export async function PainelFrequencia({
             </div>
           )}
 
-          {aulasPendentes.length > 0 && (
+          {!somenteLeitura && aulasPendentes.length > 0 && (
             <div className="rounded-xl border border-dashed border-border bg-surface p-4 text-sm">
               <div className="mb-2 text-text-secondary">Datas abertas, aguardando chamada:</div>
               <div className="flex flex-wrap gap-2">
@@ -204,6 +208,7 @@ export async function PainelFrequencia({
             </div>
           )}
 
+          {!somenteLeitura && (
           <details className="rounded-xl border border-border bg-surface p-4" open={aulasComChamada.length === 0}>
             <summary className="cursor-pointer text-sm font-medium text-primary">
               Lançar novo domingo
@@ -212,10 +217,11 @@ export async function PainelFrequencia({
               <NovaDataForm modulos={modulos} turmaId={turmaAtual.id} baseUrl={baseUrl} />
             </div>
           </details>
+          )}
         </section>
       )}
 
-      {aulaAtual && (
+      {!somenteLeitura && aulaAtual && (
         <div id="chamada" className="scroll-mt-6 rounded-xl border border-border bg-surface p-5">
           <div className="font-display text-base font-semibold text-primary">
             Chamada — {new Date(aulaAtual.data + "T00:00:00").toLocaleDateString("pt-BR")}
