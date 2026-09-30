@@ -59,15 +59,22 @@ export async function criarEscala(
     turmaIds = alvo.map((t) => t.id);
   }
 
-  const { data: jaExistem } = await supabase
+  // Uma data tem um professor por turma. Se já há outro escalado (inclusive em
+  // datas passadas, para registrar/corrigir o que aconteceu), ele é trocado.
+  const { data: doDia } = await supabase
     .from("escalas")
-    .select("turma_id")
-    .eq("pessoa_id", pessoaId)
+    .select("id, turma_id, pessoa_id")
     .eq("data", data)
     .in("turma_id", turmaIds);
-  const jaTem = new Set((jaExistem ?? []).map((e) => e.turma_id));
+  const jaTem = new Set((doDia ?? []).filter((e) => e.pessoa_id === pessoaId).map((e) => e.turma_id));
+  const trocar = (doDia ?? []).filter((e) => e.pessoa_id !== pessoaId).map((e) => e.id);
   const novas = turmaIds.filter((t) => !jaTem.has(t));
   if (novas.length === 0) return { erro: "Este professor já está escalado nessa data." };
+
+  if (trocar.length > 0) {
+    const { error: erroTroca } = await supabase.from("escalas").delete().in("id", trocar);
+    if (erroTroca) return { erro: `Falha ao trocar o professor: ${erroTroca.message}` };
+  }
 
   const { error } = await supabase.from("escalas").insert(
     novas.map((t) => ({
@@ -82,7 +89,9 @@ export async function criarEscala(
 
   revalidatePath("/escalas");
   revalidatePath("/minha-turma");
-  return { sucesso: turmaIds.length > 1 ? "Escala unificada criada (Homens e Mulheres)." : "Escala criada." };
+  revalidatePath("/coordenacao");
+  const verbo = trocar.length > 0 ? "Professor trocado" : "Escala registrada";
+  return { sucesso: turmaIds.length > 1 ? `${verbo} (Homens e Mulheres).` : `${verbo}.` };
 }
 
 export async function removerEscala(

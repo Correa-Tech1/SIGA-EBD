@@ -1,6 +1,7 @@
 // Carrega do banco tudo que o motor de métricas precisa. Só a coordenação
 // consegue ler `pessoas` inteira (nascimento, gênero) — o RLS garante isso;
 // quem chamar isto sem ser coordenação recebe listas vazias.
+import { hojeIso } from "@/lib/tempo";
 import { createClient } from "@/lib/supabase/server";
 import { semestreAtivo, listarTurmas, type Semestre } from "@/lib/estrutura/queries";
 import {
@@ -26,10 +27,7 @@ async function lerTudo<T>(
   return todas;
 }
 
-export function hojeIso(): string {
-  // data de hoje no fuso de Brasília (o servidor roda em UTC)
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
-}
+export { hojeIso };
 
 export async function carregarRelatorio(): Promise<{
   relatorio: RelatorioGeral;

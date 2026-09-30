@@ -2,6 +2,8 @@ import { carregarRelatorio, hojeIso } from "@/lib/relatorio/dados";
 import { carregarProfessores } from "@/lib/coordenacao/dados";
 import { proximosDomingos } from "@/lib/auxilio/mesa";
 import { SecaoProfessores } from "@/components/coordenacao/SecaoProfessores";
+import { SecaoProfessorFrequencia } from "@/components/coordenacao/SecaoProfessorFrequencia";
+import { frequenciaPorProfessor } from "@/lib/coordenacao/professor-frequencia";
 import { SecaoFrequencia } from "@/components/coordenacao/SecaoFrequencia";
 import { SecaoPerfil } from "@/components/coordenacao/SecaoPerfil";
 import { SecaoMovimento } from "@/components/coordenacao/SecaoMovimento";
@@ -17,10 +19,13 @@ export default async function CoordenacaoPage() {
     carregarProfessores(hoje, proximosDomingos(hoje, 1)[0]),
   ]);
 
+  const nomes = new Map(prof.linhas.map((l) => [l.id, l.nome]));
+  const profFreq = frequenciaPorProfessor(r, prof.escalasAno, nomes);
   const periodo = semestre ? `${semestre.periodo}º semestre de ${semestre.ano}` : "Semestre atual";
   const secoes = [
     { id: "professores", rotulo: "Professores" },
     { id: "frequencia", rotulo: "Frequência" },
+    { id: "professor-frequencia", rotulo: "Professor × frequência" },
     { id: "perfil", rotulo: "Perfil do público" },
     { id: "movimento", rotulo: "Movimento entre turmas" },
   ];
@@ -48,6 +53,7 @@ export default async function CoordenacaoPage() {
 
       <SecaoProfessores id="professores" dados={prof} hoje={hoje} />
       <SecaoFrequencia id="frequencia" r={r} />
+      <SecaoProfessorFrequencia id="professor-frequencia" linhas={profFreq} />
       <SecaoPerfil id="perfil" r={r} />
       <SecaoMovimento id="movimento" r={r} />
     </div>

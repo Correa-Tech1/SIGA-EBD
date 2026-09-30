@@ -115,5 +115,5 @@ export async function carregarProfessores(hoje: string, proximoDomingo: string) 
       }
     : null;
 
-  return { ano, linhas, porTurma, prontidao, turmas };
+  return { ano, linhas, porTurma, prontidao, turmas, escalasAno: [...unicas.values()] };
 }

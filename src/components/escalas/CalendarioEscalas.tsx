@@ -98,20 +98,19 @@ export function CalendarioEscalas({
     m.dias.push(d);
   }
 
-  // mês mostrado: o escolhido; senão o atual; senão o próximo com aula; senão o último
+  // mês mostrado: o escolhido; senão o da PRÓXIMA AULA (hoje em Brasília); se o
+  // semestre acabou, o último mês
   const mesAtual = hoje.slice(0, 7);
+  const proxima = dias.filter((d) => d.tipo !== "sem_aula").find((d) => d.data >= hoje)?.data ?? null;
   const chaveAtiva =
     (mesSelecionado && meses.some((m) => m.chave === mesSelecionado) && mesSelecionado) ||
-    (meses.some((m) => m.chave === mesAtual) && mesAtual) ||
-    meses.find((m) => m.chave > mesAtual)?.chave ||
+    (proxima && proxima.slice(0, 7)) ||
     meses[meses.length - 1]?.chave;
   const ativo = meses.find((m) => m.chave === chaveAtiva);
   const indice = meses.findIndex((m) => m.chave === chaveAtiva);
 
   const aulasDe = (lista: Dia[]) => lista.filter((d) => d.tipo !== "sem_aula");
   const faltamDe = (lista: Dia[]) => aulasDe(lista).filter((d) => d.data >= hoje && !porData.has(d.data)).length;
-  const proxima = dias.filter((d) => d.tipo !== "sem_aula").find((d) => d.data >= hoje)?.data ?? null;
-
   if (!ativo) return <p className="text-sm text-text-secondary">Sem datas para mostrar.</p>;
   const diasAula = aulasDe(ativo.dias);
   const comProf = diasAula.filter((d) => porData.has(d.data)).length;
@@ -283,7 +282,7 @@ function CartaoDia({
         faltaProfessor
           ? "border-2 border-dashed border-[#E0A030] bg-[#FFF8E8]"
           : "border border-border bg-surface"
-      } ${passado ? "opacity-70" : ""} ${eProxima || eHoje ? "ring-2 ring-offset-1" : ""}`}
+      } ${passado && escala ? "opacity-90" : ""} ${eProxima || eHoje ? "ring-2 ring-offset-1" : ""}`}
       style={{
         ...(escala ? { boxShadow: `inset 4px 0 0 ${cor}` } : {}),
         ...(eProxima || eHoje ? ({ "--tw-ring-color": cor } as React.CSSProperties) : {}),
@@ -329,17 +328,20 @@ function CartaoDia({
               </span>
             )}
             {podeGerenciar && (
-              <span className="ml-auto">
+              <span className="ml-auto flex items-center gap-3">
+                <Link href={hrefEscalar} className="text-xs text-primary hover:underline">
+                  trocar
+                </Link>
                 <BotaoRemoverEscala escalaId={escala.id} />
               </span>
             )}
           </div>
         ) : (
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-[#8A5A00]">{passado ? "Sem registro de professor" : "Sem professor"}</span>
+            <span className="text-sm font-semibold text-[#8A5A00]">{passado ? "Professor não registrado" : "Sem professor"}</span>
             {podeGerenciar && (
               <Link href={hrefEscalar} className="rounded-lg bg-[#D9930D] px-2.5 py-1 text-xs font-semibold text-white">
-                Escalar →
+                {passado ? "Registrar →" : "Escalar →"}
               </Link>
             )}
           </div>
