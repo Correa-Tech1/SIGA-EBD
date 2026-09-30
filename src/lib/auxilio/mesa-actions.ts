@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { exigirProfessorOuCoordenacao } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { ETAPAS, contarProntas, fmtDomingo, type EstadoEtapas } from "@/lib/auxilio/mesa";
+import { infoDaAula } from "@/lib/calendario/plano2s2026";
 
 function voltarComErro(msg: string): never {
   redirect(`/auxilio?erro=${encodeURIComponent(msg)}`);
@@ -45,7 +46,9 @@ export async function abrirPreparo(formData: FormData): Promise<void> {
   const daData = lista.find((m) => m.data_inicio && m.data_fim && m.data_inicio <= data && data <= m.data_fim);
   const modulo = daData ?? lista[lista.length - 1] ?? null;
 
-  const titulo = `Aula de ${fmtDomingo(data)}`;
+  const { data: turmaRow } = await supabase.from("turmas").select("nome").eq("id", turmaId).maybeSingle();
+  const plano = turmaRow ? infoDaAula(turmaRow.nome, data) : null;
+  const titulo = plano ? `Lição ${plano.numero} · ${plano.titulo}` : `Aula de ${fmtDomingo(data)}`;
   const { data: rascunho, error: erroRascunho } = await supabase
     .from("rascunhos")
     .insert({

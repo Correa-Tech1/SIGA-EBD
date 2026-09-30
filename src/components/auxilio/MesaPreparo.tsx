@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { ChatAuxilio } from "./ChatAuxilio";
 import { ArquivosGerados } from "./ArquivosGerados";
+import type { InfoAula } from "@/lib/calendario/plano2s2026";
 import { salvarEtapa, renomearPreparo } from "@/lib/auxilio/mesa-actions";
 import {
   ATALHOS,
@@ -33,6 +34,7 @@ export function MesaPreparo({
   cabecalho,
   dataTexto,
   tituloInicial,
+  plano,
   etapasIniciais,
   historicoInicial,
 }: {
@@ -43,6 +45,7 @@ export function MesaPreparo({
   cabecalho: string;
   dataTexto: string;
   tituloInicial: string;
+  plano: InfoAula | null;
   etapasIniciais: EstadoEtapas;
   historicoInicial: Msg[];
 }) {
@@ -103,6 +106,73 @@ export function MesaPreparo({
             </span>
           </div>
         </div>
+
+        {plano && (
+          <section className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold tracking-wide text-primary">
+                PLANO DE ENSINO · LIÇÃO {plano.numero}
+              </span>
+              {plano.tipo === "unificada" && (
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-white">UNIFICADA</span>
+              )}
+              {plano.tipo === "circulo" && (
+                <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-text-primary">CÍRCULO</span>
+              )}
+            </div>
+            {plano.tese ? (
+              <>
+                <p className="mt-2 font-display text-base leading-snug text-text-primary">{plano.tese}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={etapas.tese?.texto?.trim() === plano.tese}
+                    onClick={() => {
+                      salvar("tese", plano.tese!, false);
+                      document.getElementById("etapa-tese")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                  >
+                    {etapas.tese?.texto?.trim() === plano.tese ? "Tese já está na etapa" : "Usar como tese"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      enviarPedido(
+                        "Parta da tese oficial do Plano de Ensino para esta lição e me ajude a montar o roteiro: sugira a pergunta de abertura e os 2 ou 3 movimentos do desenvolvimento. Pergunte só o que faltar."
+                      )
+                    }
+                    className="rounded-lg border border-primary px-3 py-1.5 text-sm font-medium text-primary"
+                  >
+                    Montar a partir da tese
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm leading-snug text-text-primary">
+                  <span className="font-semibold">Capítulos-base:</span> {plano.base}
+                </p>
+                <p className="mt-1 text-xs text-text-secondary">
+                  O Plano não traz tese para o Módulo 2 — a tese sai do capítulo, pelas suas mãos.
+                </p>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      enviarPedido(
+                        "Consulte o livro-base na Biblioteca, leia os capítulos indicados no Plano de Ensino para esta lição e me proponha 3 opções de tese (uma frase cada, que a turma possa discordar), dizendo qual eu deveria usar."
+                      )
+                    }
+                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white"
+                  >
+                    Propor teses a partir do capítulo
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        )}
 
         {erro && (
           <p className="rounded-lg bg-danger/10 p-3 text-sm text-danger" role="alert">

@@ -16,6 +16,7 @@ import { METODO_SISTEMA } from "@/lib/auxilio/metodologia";
 import { montarContextoConteudo } from "@/lib/auxilio/contexto";
 import type { Mensagem, AnexoMensagem } from "@/lib/auxilio/queries";
 import { blocosDoArquivo, type BlocoArquivo } from "@/lib/auxilio/arquivos";
+import { infoDaAula } from "@/lib/calendario/plano2s2026";
 import { textoRoteiro, type EstadoEtapas } from "@/lib/auxilio/mesa";
 import { FERRAMENTAS, executarFerramenta, type ArquivoGerado } from "@/lib/auxilio/ferramentas";
 
@@ -92,12 +93,27 @@ export async function POST(request: NextRequest) {
   const etapasSalvas = ((rascunho.conteudo as { etapas?: EstadoEtapas } | null)?.etapas ?? null) as EstadoEtapas | null;
   const { data: preparo } = await supabase
     .from("preparos")
-    .select("id, titulo, data")
+    .select("id, titulo, data, turma_id")
     .eq("rascunho_id", rascunhoId)
     .maybeSingle();
   const contextoBase = await montarContextoConteudo(rascunho.aula_id, rascunho.modulo_id);
+  const { data: turmaPreparo } = preparo
+    ? await supabase.from("turmas").select("nome").eq("id", preparo.turma_id).maybeSingle()
+    : { data: null };
+  const plano = preparo && turmaPreparo ? infoDaAula(turmaPreparo.nome, preparo.data) : null;
+  const textoPlano = plano
+    ? `\nPLANO DE ENSINO para esta aula (${turmaPreparo?.nome}, lição ${plano.numero}: "${plano.titulo}"${
+        plano.tipo === "unificada" ? ", aula UNIFICADA de Homens e Mulheres" : plano.tipo === "circulo" ? ", dia de CÍRCULO" : ""
+      }${plano.rotulo ? `, ${plano.rotulo}` : ""}):\n${
+        plano.tese
+          ? `Tese oficial: ${plano.tese}\n(Se o professor ainda não escreveu a tese, parta desta; se escreveu outra, ajude a afiá-la sem perder a tese do Plano.)`
+          : plano.base
+            ? `Capítulos-base (o Plano não traz tese para o Módulo 2): ${plano.base}\nConsulte o livro na Biblioteca e ajude o professor a formular uma tese própria a partir do capítulo.`
+            : ""
+      }\n`
+    : "";
   const contexto = preparo
-    ? `${contextoBase}\nAula em preparo: "${preparo.titulo}" (domingo ${preparo.data})\n\nROTEIRO ATUAL DO PROFESSOR (o que ele já escreveu; trate como a base da conversa e não peça de novo o que já está aqui):\n${textoRoteiro(etapasSalvas ?? {})}`
+    ? `${contextoBase}${textoPlano}\nAula em preparo: "${preparo.titulo}" (domingo ${preparo.data})\n\nROTEIRO ATUAL DO PROFESSOR (o que ele já escreveu; trate como a base da conversa e não peça de novo o que já está aqui):\n${textoRoteiro(etapasSalvas ?? {})}`
     : contextoBase;
 
   const anthropic = new Anthropic({ apiKey: chaveApi });

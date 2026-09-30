@@ -7,7 +7,8 @@ import { MesaPreparo } from "@/components/auxilio/MesaPreparo";
 import { listarTurmas } from "@/lib/estrutura/queries";
 import { listarMinhasTurmasIds } from "@/lib/frequencia/queries";
 import { createClient } from "@/lib/supabase/server";
-import { abrirPreparo } from "@/lib/auxilio/mesa-actions";
+import { NovoPreparoForm } from "@/components/auxilio/NovoPreparoForm";
+import { infoDaAula } from "@/lib/calendario/plano2s2026";
 import { ETAPAS, fmtDomingo, proximosDomingos, type EstadoEtapas } from "@/lib/auxilio/mesa";
 import { hojeIso } from "@/lib/relatorio/dados";
 import { corDaTurma } from "@/lib/relatorio/cores";
@@ -104,11 +105,7 @@ export default async function AuxilioProfessorPage({
   const hoje = hojeIso();
   const nomeTurma = (id: string) => todasTurmas.find((t) => t.id === id)?.nome ?? "Turma";
 
-  // sugestões: próximos domingos ainda sem preparo
-  const domingos = proximosDomingos(hoje, 3);
-  const sugestoes = turmas.flatMap((t) =>
-    domingos.filter((d) => !lista.some((p) => p.turma_id === t.id && p.data === d)).map((d) => ({ turma: t, data: d }))
-  );
+  const domingos = proximosDomingos(hoje, 4);
 
   let corpo: React.ReactNode = null;
   if (aberto?.rascunho_id) {
@@ -133,6 +130,7 @@ export default async function AuxilioProfessorPage({
             month: "2-digit",
           })}
           tituloInicial={aberto.titulo}
+          plano={infoDaAula(turma.nome, aberto.data)}
           etapasIniciais={conteudo.etapas ?? {}}
           historicoInicial={conteudo.historico ?? []}
         />
@@ -151,7 +149,7 @@ export default async function AuxilioProfessorPage({
         <aside className="space-y-3">
           <h1 className="font-display text-lg font-semibold text-primary">Suas aulas</h1>
           {lista.length === 0 && (
-            <p className="text-sm text-text-secondary">Escolha abaixo o domingo que você vai preparar.</p>
+            <p className="text-sm text-text-secondary">Escolha abaixo a turma e a data da aula que você vai preparar.</p>
           )}
           {lista.map((p) => {
             const pct = Math.round((p.etapas_prontas / (p.etapas_total || ETAPAS.length)) * 100);
@@ -179,25 +177,7 @@ export default async function AuxilioProfessorPage({
             );
           })}
 
-          {sugestoes.length > 0 && (
-            <div className="rounded-xl border border-dashed border-primary/50 p-3">
-              <p className="mb-2 text-xs font-semibold tracking-wide text-primary">PREPARAR OUTRA AULA</p>
-              <div className="space-y-1.5">
-                {sugestoes.map((s) => (
-                  <form key={s.turma.id + s.data} action={abrirPreparo}>
-                    <input type="hidden" name="turmaId" value={s.turma.id} />
-                    <input type="hidden" name="data" value={s.data} />
-                    <button
-                      type="submit"
-                      className="w-full rounded-lg px-2 py-2 text-left text-sm text-primary hover:bg-primary/5"
-                    >
-                      + {s.turma.nome} · domingo {fmtDomingo(s.data)}
-                    </button>
-                  </form>
-                ))}
-              </div>
-            </div>
-          )}
+          <NovoPreparoForm turmas={turmas.map((t) => ({ id: t.id, nome: t.nome }))} domingos={domingos} />
 
           <Link href="/auxilio?rascunho=livre" className="block text-xs text-text-secondary hover:underline">
             Conversas livres (sem aula)
