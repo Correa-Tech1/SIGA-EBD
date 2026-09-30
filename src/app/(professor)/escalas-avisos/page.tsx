@@ -9,7 +9,7 @@ import { corDaTurma } from "@/lib/relatorio/cores";
 export default async function EscalasAvisosProfessorPage({
   searchParams,
 }: {
-  searchParams: { turma?: string };
+  searchParams: { turma?: string; data?: string };
 }) {
   const [turmas, minhasIds] = await Promise.all([listarTurmas(), listarMinhasTurmasIds()]);
 
@@ -53,7 +53,7 @@ export default async function EscalasAvisosProfessorPage({
         </div>
       )}
 
-      <PainelEscalas turma={turmaAtual} todasAsTurmas={turmas} podeGerenciar={false} turmasParaAviso={minhas} />
+      <PainelEscalas basePath="/escalas-avisos" dataInicial={searchParams.data} turma={turmaAtual} todasAsTurmas={turmas} podeGerenciar={false} turmasParaAviso={minhas} />
     </div>
   );
 }

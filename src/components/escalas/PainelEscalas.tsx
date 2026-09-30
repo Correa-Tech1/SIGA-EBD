@@ -1,7 +1,9 @@
 import { listarEscalas, listarAvisos, listarProfessoresParaEscala } from "@/lib/escalas/queries";
-import { FormularioEscala, BotaoRemoverEscala, FormularioAviso, BotaoApagarAviso } from "./ClientForms";
+import { FormularioEscala, FormularioAviso, BotaoApagarAviso } from "./ClientForms";
 import { getSessaoAtual } from "@/lib/auth/session";
-import type { Turma } from "@/lib/estrutura/queries";
+import { semestreAtivo, type Turma } from "@/lib/estrutura/queries";
+import { hojeIso } from "@/lib/relatorio/dados";
+import { CalendarioEscalas } from "./CalendarioEscalas";
 
 // Escala (quem dá aula quando) + Avisos (mural) de uma turma. Compartilhado
 // entre /escalas (coordenação, `podeGerenciar=true`: cria/remove escala e
@@ -13,62 +15,45 @@ export async function PainelEscalas({
   todasAsTurmas,
   podeGerenciar,
   turmasParaAviso,
+  basePath,
+  dataInicial,
 }: {
   turma: Turma;
   todasAsTurmas: Turma[];
   podeGerenciar: boolean;
   // turmas onde quem está vendo pode postar aviso (professor: só as próprias)
   turmasParaAviso?: Turma[];
+  basePath: string; // "/escalas" ou "/escalas-avisos" (links de Escalar)
+  dataInicial?: string;
 }) {
-  const [escalas, avisos, pessoas, sessao] = await Promise.all([
+  const [escalas, avisos, pessoas, sessao, semestre] = await Promise.all([
     listarEscalas(turma.id),
     listarAvisos(turma.id),
     podeGerenciar ? listarProfessoresParaEscala(turma.id) : Promise.resolve([]),
     getSessaoAtual(),
+    semestreAtivo(),
   ]);
+  const hoje = hojeIso();
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-border bg-surface p-5">
-        <div className="font-display text-base font-semibold text-primary">Escala de professores</div>
-        <p className="mb-3 mt-1 text-xs text-text-secondary">Quem dá aula em cada data.</p>
+      {podeGerenciar && (
+        <div id="escalar" className="scroll-mt-4 rounded-xl border border-border bg-surface p-4">
+          <div className="mb-2 font-display text-base font-semibold text-primary">Escalar professor</div>
+          <FormularioEscala key={dataInicial ?? "livre"} turmaId={turma.id} professores={pessoas} dataInicial={dataInicial} />
+        </div>
+      )}
 
-        {escalas.length === 0 ? (
-          <p className="text-sm text-text-secondary">Ninguém escalado ainda.</p>
-        ) : (
-          <div className="rounded-lg border border-border-light">
-            {escalas.map((e, i) => (
-              <div
-                key={e.id}
-                className={`flex items-center justify-between px-4 py-2.5 ${
-                  i > 0 ? "border-t border-border-light" : ""
-                }`}
-              >
-                <div className="text-sm">
-                  {new Date(e.data + "T00:00:00").toLocaleDateString("pt-BR")} — {e.pessoa_nome}
-                  {e.unificada && (
-                    <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                      unificada
-                    </span>
-                  )}
-                  {e.tipo !== "regular" && (
-                    <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent">
-                      {e.tipo}
-                    </span>
-                  )}
-                </div>
-                {podeGerenciar && <BotaoRemoverEscala escalaId={e.id} />}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {podeGerenciar && (
-          <div className="mt-3">
-            <FormularioEscala turmaId={turma.id} professores={pessoas} />
-          </div>
-        )}
-      </div>
+      <CalendarioEscalas
+        turma={turma}
+        escalas={escalas}
+        hoje={hoje}
+        semestreInicio={semestre?.data_inicio ?? null}
+        semestreFim={semestre?.data_fim ?? null}
+        podeGerenciar={podeGerenciar}
+        minhaPessoaId={sessao.pessoaId}
+        hrefEscalar={(d) => `${basePath}?turma=${turma.id}&data=${d}#escalar`}
+      />
 
       <div className="rounded-xl border border-border bg-surface p-5">
         <div className="font-display text-base font-semibold text-primary">Avisos</div>

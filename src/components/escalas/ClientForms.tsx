@@ -40,7 +40,15 @@ function Mensagens({ estado }: { estado: EstadoForm }) {
   );
 }
 
-export function FormularioEscala({ turmaId, professores }: { turmaId: string; professores: ProfessorOpcao[] }) {
+export function FormularioEscala({
+  turmaId,
+  professores,
+  dataInicial,
+}: {
+  turmaId: string;
+  professores: ProfessorOpcao[];
+  dataInicial?: string;
+}) {
   const [estado, acao] = useFormState(criarEscala, estadoInicial);
   const [tipo, setTipo] = useState<string>(professores.find((p) => p.daTurma)?.tipo ?? professores[0]?.tipo ?? "regular");
   const daTurma = professores.filter((p) => p.daTurma);
@@ -82,6 +90,7 @@ export function FormularioEscala({ turmaId, professores }: { turmaId: string; pr
           name="data"
           type="date"
           required
+          defaultValue={dataInicial}
           className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
         />
       </div>

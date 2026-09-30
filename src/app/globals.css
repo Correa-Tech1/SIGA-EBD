@@ -5,3 +5,15 @@
 body {
   @apply bg-bg text-text-primary;
 }
+
+/* Domingo sem aula: fundo listrado, bem diferente do dia de aula. */
+.sem-aula-listras {
+  background-color: #f3f5f6;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(120, 144, 156, 0.14) 0,
+    rgba(120, 144, 156, 0.14) 8px,
+    transparent 8px,
+    transparent 16px
+  );
+}

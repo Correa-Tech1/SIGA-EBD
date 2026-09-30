@@ -58,7 +58,7 @@ export default async function MinhaTurmaPage({
       <div>
         <h2 className="font-display text-lg font-semibold text-primary">Minha escala &amp; avisos</h2>
       </div>
-      <PainelEscalas turma={turmaAtual} todasAsTurmas={turmas} podeGerenciar={false} />
+      <PainelEscalas basePath="/minha-turma" turma={turmaAtual} todasAsTurmas={turmas} podeGerenciar={false} />
     </div>
   );
 }
